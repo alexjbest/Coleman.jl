@@ -3,6 +3,9 @@ uuid = "18c793ea-2cd8-11e9-298f-8de9fd461f0e"
 authors = ["Alex J. Best <alex.j.best@gmail.com>"]
 version = "0.1.0"
 
+[deps]
+Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
+
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
