@@ -35,6 +35,9 @@ include("LinearRecurrence.jl")
 import AbstractAlgebra.RelSeriesElem
 import AbstractAlgebra.Ring
 import AbstractAlgebra.Generic
+using Nemo
+
+export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, lift_x, verify_pts, count_points
 
 # Some dumb useless to everyone else functions that let me use nmod as if it were padic
 function Nemo.frobenius(a::Union{Nemo.nmod, Generic.Res{fmpz}, SeriesElem})
@@ -861,12 +864,30 @@ end
 
 function Nemo.root(r::Nemo.gfp_elem, a::Int64)
     K = parent(r)
-    for x in 0:Int(characteristic(K))
+    for x in 0:Int(characteristic(K))-1
         if K(x)^a == r
             return K(x)
         end
     end
     error("no root")
+end
+
+function count_points(a::Int, h::PolyElem{Nemo.gfp_elem})
+    K = base_ring(h)
+    N = gcd(Int(characteristic(K)) - 1, a)
+    su = 0::Int
+    for x in 0:Int(characteristic(K))-1
+        try
+            y = root(h(x),a)
+            if y == 0
+                su += 1
+            else
+                su += N
+            end
+        catch
+        end
+    end
+    return su
 end
 
 function FrobeniusLift(a, h, p, P)
@@ -877,6 +898,15 @@ function FrobeniusLift(a, h, p, P)
             P[2]^p * root(1 + (h(P[1]^p) - h(P[1])^p)//(P[2]^(a*p)), a))
 
 end
+
+function Nemo.derivative(f::Generic.Frac{<:PolyElem})
+    return (derivative(numerator(f))*denominator(f) - derivative(denominator(f))*numerator(f))//(denominator(f)^2)
+end
+
+function (f::Generic.Frac{<:PolyElem})(x::RingElem)
+    return numerator(f)(x)//denominator(f)(x)
+end
+
 
 function Generic.derivative(x::RelSeriesElem{T}) where {T <: RingElement}
    xlen = pol_length(x)
