@@ -15,4 +15,12 @@ end
     h = x^9 + 1321*x^5 + 12321*x + 1765765
 
     test_zeta(a, h, 1)
+
+    a = 3
+    h = x^8 + 1321*x^5 + 12321*x + 1765765
+    test_zeta(a, h, 1)
+
+    a = 4
+    h = x^13 + 1765765
+    test_zeta(a, h, 1)
 end
