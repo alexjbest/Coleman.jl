@@ -4,7 +4,7 @@ using Test
 
 function test_zeta(a, h, inf_pts)
 
-    @test derivative(ZetaFunction(a, h))(ZZ(0)) == count_points(a, h) + inf_pts
+    @test derivative(ZetaFunction(a, h))(ZZ(0)) == ZZ(count_points(a, h) + inf_pts)
 
 end
 
