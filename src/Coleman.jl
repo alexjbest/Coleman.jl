@@ -32,6 +32,8 @@ module Coleman
 #*****************************************************************************
 
 include("LinearRecurrence.jl")
+include("Misc.jl")
+
 import AbstractAlgebra.RelSeriesElem
 import AbstractAlgebra.Ring
 import AbstractAlgebra.Generic
@@ -1120,6 +1122,23 @@ end
 
 function TinyColemanIntegralsOnBasis(a, h, N, p, n, P, Q)
     return elem_type(base_ring(h))[TinyColemanIntegralMonomial(a, h, N, p, n, P, Q, i, j) for (i,j) in BasisMonomials(a, h)]
+end
+
+function rational_pts(a, h, bound)
+    x = FlintQQ(0)
+    ret = Tuple{fmpq,fmpq}[]
+    while height(x) <= bound
+        try
+            y = root(h(x), a)
+            push!(ret, (x,y))
+            if a == 2
+                push!(ret, (x,-y))
+            end
+        catch e
+        end
+        x = next_signed_minimal(x)
+    end
+    return ret
 end
 
 function ColemanIntegrals(a, h, N, p, n, x, y = :inf)
