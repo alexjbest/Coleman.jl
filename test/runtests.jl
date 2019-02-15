@@ -10,7 +10,18 @@ function test_zeta(a, h, inf_pts)
 
 end
 
+function test_rat_pts(a, h, bound, rat_pts)
+
+    @test sort(rational_pts(a, h, bound)) == sort(rat_pts)
+
+end
+
 @testset "Coleman.jl" begin
+    R, x = PolynomialRing(FlintQQ, "x")
+    # http://beta.lmfdb.org/Genus2Curve/Q/3153/a/9459/1
+    h =x^5 +2*x^4 -3*x^3 -x^2 +x + 1//4
+    test_rat_pts(2, h, 70, [(-1, -2 + 1//2), (-1, 1 + 1//2), (0, -1 + 1//2), (0, 0 + 1//2), (1, -1 + 1//2), (1, 0 + 1//2), (4, -37 + 1//2), (4, 36 + 1//2)])
+
     a = 2
     R, x = PolynomialRing(Nemo.GF(307), "x")
 
@@ -26,4 +37,6 @@ end
     a = 4
     h = x^11 + 1765765
     test_zeta(a, h, 1)
+
+
 end

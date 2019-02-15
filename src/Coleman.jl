@@ -39,7 +39,7 @@ import AbstractAlgebra.Ring
 import AbstractAlgebra.Generic
 using Nemo
 
-export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, lift_x, verify_pts, count_points
+export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, lift_x, verify_pts, count_points, rational_pts
 
 # Some dumb useless to everyone else functions that let me use nmod as if it were padic
 function Nemo.frobenius(a::Union{Nemo.nmod, Generic.Res{fmpz}, SeriesElem, padic})
