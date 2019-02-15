@@ -439,7 +439,7 @@ function VRedMatrixSeq(j, a, h, r_, s_, p, N, R1MatV, R1PolMatV, pts)
     t_ = vcat([ 0 ], [ Row(-p*(a*k + j), a) for k in 0:(N-1) ])
     L_ = [ t_[i] for i in 1:(length(t_)-1) ]
     R_ = [ t_[i] for i in 2:length(t_) ]
-    slr = floor(Int64, log(4, R_[end]))
+    slr = floor(Int, log(4, R_[end]))
     DDi = UpperCaseDD(one(R1), R1(2^slr), 2^slr)
     DDi = inv(DDi)
     #@debug "DDi"
@@ -534,11 +534,11 @@ end
 
 function AbsoluteFrobeniusAction(a, hbar, N, pts = [])
     K = base_ring(hbar)
-    p = convert(Int64,characteristic(K))
+    p = convert(Int,characteristic(K))
     n = degree(K)
 
     if n == 1
-        if fits(Int64, FlintZZ(p)^(N+1))
+        if fits(Int, FlintZZ(p)^(N+1))
             R0 = ResidueRing(FlintZZ, p^N)
             R1 = ResidueRing(FlintZZ, p^(N+1))
         else
@@ -600,7 +600,7 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
             if true
                 R0 = FlintPadicField(p, N)
                 R1 = FlintPadicField(p, N + 1)
-            elseif fits(Int64, FlintZZ(p)^(N+1)) # Old code, maybe more efficient eventually
+            elseif fits(Int, FlintZZ(p)^(N+1)) # Old code, maybe more efficient eventually
                 R0 = ResidueRing(FlintZZ, p^N)
                 R1 = ResidueRing(FlintZZ, p^(N+1))
             else
@@ -663,7 +663,7 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
         mn = min(N, B)
         L_ = [ (l-1)*p for l in 1:mn ]
         R_ = [ (l*p -b-1) for l in 1:mn ]
-        slr = floor(Int64, log(4, R_[end]))
+        slr = floor(Int, log(4, R_[end]))
         DDi = UpperCaseDD(one(R0), R0(2^slr), 2^slr)
         DDi = inv(DDi)
         #@debug "DDi"
@@ -787,7 +787,7 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
 #   A rational function over FlintQQ
 #
     # Step 0: Setup
-    p = convert(Int64,characteristic(base_ring(hbar)))
+    p = convert(Int,characteristic(base_ring(hbar)))
     q = order(base_ring(hbar))
     n = degree(base_ring(hbar))
     g = ((a-1)*(degree(hbar)-1)) >> 1
@@ -795,7 +795,7 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     # Step 1: Determine needed precision
     bound = n*g/2 + 2*g*log(p,2)
     # N is the first integer strictly larger than bound
-    N = floor(Int64, bound+1)
+    N = floor(Int, bound+1)
     #@debug N
 
     # Step 2: Determine absolute Frobenius action mod precision
@@ -864,7 +864,7 @@ function Nemo.root(a::Nemo.padic, n::Int)
     return exp(log(a)//n)
 end
 
-function Nemo.root(r::Nemo.gfp_elem, a::Int64)
+function Nemo.root(r::Nemo.gfp_elem, a::Int)
     K = parent(r)
     for x in 0:Int(characteristic(K))-1
         if K(x)^a == r

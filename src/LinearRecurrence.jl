@@ -573,7 +573,7 @@ function MatrixEvaluationPre(M, k, ki_)
     points_ = [ R(i) for i in 0:(k2-1) ]
     RPol = base_ring(M)
     x = gen(RPol)
-    logk2 = floor(Int64,log2(k2))
+    logk2 = floor(Int,log2(k2))
     Mij_ = Algorithm10_3([ x-points_[i] for i in 1:k2 ], logk2)
 
     # iii. call algorithm 10_9
@@ -611,7 +611,7 @@ function MatrixEvaluation(Mk, k2, beta_)
     RPol = base_ring(Mk)
     x = gen(RPol)
     RMat = MatrixSpace(R,n,n)
-    logk2 = floor(Int64,log2(k2))
+    logk2 = floor(Int,log2(k2))
 
     # 3: Evaluate M_k(X) at the points specified by beta_
     res_ = [ zero(RMat) for i in 1:length(beta_) ]
@@ -678,7 +678,7 @@ function UpperCaseDD(alpha, beta, k)
 end
 
 function LinearRecurrence(M, L_, R_)
-    s = Int64(floor(log(4,R_[end])))
+    s = Int(floor(log(4,R_[end])))
     R = base_ring(base_ring(M))
     return LinearRecurrence(M, L_, R_, inv(R(UpperCaseDD(1,2^s,2^s))), s)
 end
@@ -824,7 +824,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         # note: since k > 2r, we have
         # k < kOld \le 2^s (*)
         # k2 is smallest power of 2 strictly larger than k
-        k2 = 2^(floor(Int64,log2(k))+1)
+        k2 = 2^(floor(Int,log2(k))+1)
         # we need k2:use the tree structure of MatrixEvaluation
         # note: because of (*), k2 \le 2^s
         # for each interval boundary we'll have rho intervals
@@ -894,7 +894,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         if (k > r)
             # else we may safely skip the following
             # also: we wouldn't have enough inverses
-            r2 = 2^(floor(Int64,log2(r))+1)
+            r2 = 2^(floor(Int,log2(r))+1)
             # same thing as before with k and k2
             MPre = MatrixEvaluationPre(M, r, ki_[1:r2-1])
             M_ = MatrixEvaluation(MPre, r2, [ LApprox_[j]-r for j in 1:r0 ])
