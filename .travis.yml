@@ -12,6 +12,7 @@ matrix:
   fast_finish: true
 notifications:
   email: false
+coveralls: true
 after_success:
   - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(process_folder())'
 script:
