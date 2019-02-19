@@ -17,7 +17,7 @@ after_success:
   - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(process_folder())'
 script:
  - while sleep 30; do echo "still alive"; done &
- - julia -e 'using Pkg; Pkg.build(); Pkg.test(coverage=true)'
+ - julia -e 'using Pkg; Pkg.build(); Pkg.dev("AbstracAlgebra"); Pkg.test(coverage=true)'
 jobs:
   include:
     - stage: Documentation
