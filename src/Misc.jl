@@ -1,5 +1,6 @@
 
 import AbstractAlgebra.Generic.LaurentSeriesElem
+import AbstractAlgebra.Generic.LaurentSeriesFieldElem
 
 #@doc Markdown.doc"""
 #    root(a::fmpq, n::Int)
@@ -34,7 +35,7 @@ function (f::LaurentSeriesFieldElem)(x::LaurentSeriesFieldElem)
 end
 
 
-function Generic.integral(x::LaurentSeriesElem)
+function Generic.integral(x::Generic.LaurentSeriesElem)
    z = deepcopy(x)
    set_prec!(z, precision(x) + 1)
    set_val!(z, valuation(x) + 1)
@@ -48,7 +49,7 @@ function Generic.integral(x::LaurentSeriesElem)
    return z
 end
 
-function Generic.derivative(x::LaurentSeriesElem{T}) where {T <: RingElement}
+function Generic.derivative(x::Generic.LaurentSeriesElem)
    z = deepcopy(x)
    set_prec!(z, precision(x) - 1)
    set_val!(z, valuation(x) - 1)
