@@ -1,6 +1,7 @@
 
 import AbstractAlgebra.Generic.LaurentSeriesElem
 import AbstractAlgebra.Generic.LaurentSeriesFieldElem
+import AbstractAlgebra.Generic.PolyElem
 
 #@doc Markdown.doc"""
 #    root(a::fmpq, n::Int)
@@ -62,3 +63,29 @@ function Generic.derivative(x::Generic.LaurentSeriesElem)
    z = rescale!(z)
    return z
 end
+
+
+function Generic.mod(f::Generic.PolyElem{T}, g::Generic.PolyElem{T}) where {T <: Generic.SeriesElem}
+   check_parent(f, g)
+   if length(g) == 0
+      throw(DivideError())
+   end
+   if length(f) >= length(g)
+      f = deepcopy(f)
+      b = lead(g)
+      g = inv(b)*g
+      c = base_ring(f)()
+      while length(f) >= length(g)
+         l = -lead(f)
+         for i = 1:length(g) - 1
+            c = mul!(c, coeff(g, i - 1), l)
+            u = coeff(f, i + length(f) - length(g) - 1)
+            u = addeq!(u, c)
+            f = setcoeff!(f, i + length(f) - length(g) - 1, u)
+         end
+         set_length!(f, normalise(f, length(f) - 1))
+      end
+   end
+   return f
+end
+
