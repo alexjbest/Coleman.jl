@@ -21,10 +21,6 @@ function (R::Nemo.GaloisField)(x::fmpq)
 end
 
 
-function Nemo.add!(a::padic, b::padic, c::padic)
-   return b + c
-end
-
 function (f::LaurentSeriesFieldElem)(x::LaurentSeriesFieldElem)
     @assert parent(f) == parent(x)
     K = parent(f)
