@@ -49,6 +49,11 @@ function (R::FlintIntegerRing)(n::fmpz_poly)
     return R(coeff(n,0))
 end
 
+function (R::FlintIntegerRing)(n::fmpq)
+    @assert denominator(n) == 1
+    return R(numerator(n))
+end
+
 function (R::FlintIntegerRing)(n::fmpq_poly)
     return R(coeff(n,0))
 end
@@ -68,8 +73,22 @@ function lift_elem(ei)
     return lift(FmpzPolyRing(:x), ei)
 end
 
+function lift_elem(ei::Integer)
+    return ei
+end
+
+function lift_elem(ei::Nemo.FinFieldElem)
+    R = FmpzPolyRing(:x)
+    x = gen(R)
+    o = zero(R)
+    for i in 0:degree(parent(ei))-1
+        o += coeff(ei, i)*x^i
+    end
+    return o
+end
+
 function lift_elem(ei::Nemo.padic)
-    return lift(ZZ, ei)
+    return lift(QQ, ei)
 end
 
 function lift_elem(ei::Nemo.fmpq)

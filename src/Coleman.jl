@@ -37,13 +37,19 @@ include("Misc.jl")
 import AbstractAlgebra.RelSeriesElem
 import AbstractAlgebra.Ring
 import AbstractAlgebra.Generic
+import AbstractAlgebra.Generic.LaurentSeriesElem
+import AbstractAlgebra.Generic.LaurentSeriesFieldElem
 using Nemo
 
-export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, lift_x, verify_pts, count_points, rational_pts
+export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, TeichmullerPoint, lift_y, lift_x, verify_pt, verify_pts, count_points, rational_points, FrobeniusLift, padic_evaluate
 
 # Some dumb useless to everyone else functions that let me use nmod as if it were padic
 function Nemo.frobenius(a::Union{Nemo.nmod, Generic.Res{fmpz}, SeriesElem, padic})
     return a
+end
+
+function Nemo.frobenius(a::Generic.Poly)
+    return parent(a)([frobenius(coeff(a, i)) for i in 0:degree(a)])
 end
 
 function Nemo.degree(R::Nemo.GaloisField)
@@ -56,6 +62,14 @@ end
 
 function Nemo.degree(R::Nemo.NmodRing)
     return 1
+end
+
+function Nemo.degree(R::Nemo.FlintPadicField)
+    return 1
+end
+
+function (R::Nemo.FqFiniteField)(f::fmpz_poly)
+    return f(gen(R))
 end
 
 # A few generalities on the differentials and the spaces W_{s,t}:
@@ -297,7 +311,6 @@ function HRedMatrix(t, iota, a, h, R1PolMatH, pts)
     for i = 1:length(pts)
         resM[b,b+i] = -a*(pts[i][2])^(-(iota-a))
         resM[b+i, b+i] = (resD)*pts[i][1]
-
     end
 
     return resM, resD
@@ -348,7 +361,7 @@ R0PolMatH)
                 c = one(R0)
                 for i = 1:N
                     tempD_[l] = tempD_[l] + taylor_[i]*c
-                    c = c*l # Ideally we should be able to write c*l here?
+                    c = c*FlintZZ(l) # Ideally we should be able to write c*l here?
                 end
             end
             # matrix
@@ -456,7 +469,7 @@ function VRedMatrixSeq(j, a, h, r_, s_, p, N, R1MatV, R1PolMatV, pts)
     end
     for m = 1:length(pts)
         for i = 1:b-1
-            genM[i,m+b-1] = -a*evaluate(s_[i], pts[m][1])*(pts[m][2])^(iota-a)
+            genM[i,m+b-1] = -a*evaluate(s_[i], pts[m][1])*(pts[m][2])^(-iota)
         end
 
         genM[b-1+m, b-1+m] = (a*t +iota-a)*(pts[m][2])^(-a)
@@ -588,7 +601,7 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
     # Check user input
     #(! IsFinite(K)) && error("The curve must be defined over a finite field.")
     #(! IsSeparable(h)) && error("The current implementation only supports squarefree h.")
-    (gcd(a,b) != 1) && error("The current implementation needs a and the degree of h to be coprime.")
+    (gcd(a,b) != 1) && error("The current implementation needs $a and the degree of $h to be coprime.")
     (a < 2) && error("Please enter an integer a > 1.")
     (b < 2) && error("Please enter a polynomial h of degree > 1.")
     (N < 1) && error("Please enter a positive precision N")
@@ -628,7 +641,7 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
     h = cast_poly_nmod(R1Pol,h)
     #@debug h
 
-    pts = [(R1(P[1]),R1(P[2])) for P in pts]
+    pts = [(R1(lift_elem(P[1])),R1(lift_elem(P[2]))) for P in pts]
 
     # Step 1: Horizontal reduction
     R1MatH = MatrixSpace(R1, b + l, b + l)
@@ -751,6 +764,7 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
             end
         end
     end
+    @assert res != 0
 
     # Return just the matrix of frobenius if we have no points
     if l == 0
@@ -790,7 +804,7 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     p = convert(Int,characteristic(base_ring(hbar)))
     q = order(base_ring(hbar))
     n = degree(base_ring(hbar))
-    g = ((a-1)*(degree(hbar)-1)) >> 1
+    g = divexact(((a-1)*(degree(hbar)-1)),2)
 
     # Step 1: Determine needed precision
     bound = n*g/2 + 2*g*log(p,2)
@@ -818,6 +832,7 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     ZPol,t = PolynomialRing(FlintZZ,"t")
     #CP = charpoly(PolynomialRing(base_ring(M),"t")[1],M::MatElem{RingElem})
     CP = invoke(charpoly, Tuple{Ring, Union{MatElem{Nemo.nmod},Generic.Mat}},  PolynomialRing(base_ring(M),"t")[1], M)
+    println(CP)
     Chi = cast_poly_nmod(ZPol, CP)
     L = numerator(t^(2*g)*(Chi)(1//t))
     coeff_ = [ coeff(L, i) for i in 0:(2*g) ]
@@ -860,7 +875,19 @@ function IsWeil(P, sqrtq)
 
 end
 
-function Nemo.root(a::Nemo.padic, n::Int)
+function Nemo.root(a::Union{Nemo.padic,Nemo.qadic}, n::Int)
+    if valuation(a) != 0
+        if valuation(a) % n == 0
+            K = parent(a)
+            N = divexact(valuation(a), n)
+            println(N)
+            uniformizer = K(prime(K))
+            println(a)
+            return exp(log(a//(uniformizer^valuation(a)))//n)*uniformizer^N
+        else
+            error("no root over ground field")
+        end
+    end
     return exp(log(a)//n)
 end
 
@@ -874,13 +901,32 @@ function Nemo.root(r::Nemo.gfp_elem, a::Int)
     error("no root")
 end
 
+function Nemo.root(r::Nemo.fq, a::Int; not = nothing)
+    K = parent(r)
+    u = gen(K)
+    p = characteristic(K)
+    n = degree(K)
+    ui = [u^i for i in 0:(n-1)]
+    for xp in collect(Base.product([1:Int(p) for i in 0:(n-1)]...))
+        x = sum([xp[i] * ui[i] for i in 1:(n-1)])
+        if K(x)^a == r && (not != nothing || x != not)
+            return K(x)
+        end
+    end
+    error("no root")
+end
+
+function count_points_bad(a::Int, h::PolyElem{Nemo.gfp_elem})
+    return length(rational_points(a, h))
+end
+
 function count_points(a::Int, h::PolyElem{Nemo.gfp_elem})
     K = base_ring(h)
     N = gcd(Int(characteristic(K)) - 1, a)
-    su = 0::Int
+    su = 0
     for x in 0:Int(characteristic(K))-1
         try
-            y = root(h(x),a)
+            y = root(h(x), a)
             if y == 0
                 su += 1
             else
@@ -892,13 +938,53 @@ function count_points(a::Int, h::PolyElem{Nemo.gfp_elem})
     return su
 end
 
-function FrobeniusLift(a, h, p, P)
+function rational_points(a::Int, h::PolyElem{Nemo.gfp_elem})
+    K = base_ring(h)
+    N = gcd(Int(characteristic(K)) - 1, a)
+    zeta = gen(K)^Int(divexact(characteristic(K) - 1, N))
+    ret = []
+    for x in 0:Int(characteristic(K))-1
+        try
+            y = root(h(x), a)
+            if y == 0
+                push!(ret, (x, y))
+            else
+                push!(ret, [(x,zeta^i*y) for i in 0:N-1]...)
+            end
+        catch
+        end
+    end
+    return ret
+end
+
+function superelliptic_automorphism(a, h, p, n, P)
+    @assert mod(ZZ(p^n - 1),ZZ(a)) == 0
+    zeta = teichmuller(gen(base_ring(h)))^(divexact(ZZ(p^n - 1),ZZ(a)))
+
+    return (P[1], zeta*P[2])
+end
+
+function FrobeniusLift(a::Int, h, p::Int, P::Tuple{Any,Any}, m = 1)
+    if m != 1 # apply recursively
+        return FrobeniusLift(a, h, p, FrobeniusLift(a, h, p, P, m - 1), 1)
+    end
     # TODO only padic rn I gues?
     K = base_ring(h)
     P = (K(P[1]), K(P[2]))
     return ((P[1])^p,
-            P[2]^p * root(1 + (h(P[1]^p) - h(P[1])^p)//(P[2]^(a*p)), a))
+            P[2]^p * root(1 + (frobenius(h)(P[1]^p) - h(P[1])^p)//(P[2]^(a*p)), a))
 
+end
+
+function TeichmullerPoint(a::Int, h, p::Int, P::Tuple{Any, Any})
+    old = new = P
+    old = (old[1] + 1, old[2])
+    while old != new
+        old = new
+        new = FrobeniusLift(a, h, p, new)
+    end
+
+    return new
 end
 
 function Nemo.derivative(f::Generic.Frac{<:PolyElem})
@@ -1002,12 +1088,13 @@ function Generic.derivative(x::AbsSeriesElem{T}) where {T <: RingElement}
 end
 
 
-function padic_evaluate(f::SeriesElem, x::RingElem)
-    ret = zero(base_ring(f))
+function padic_evaluate(f::Union{SeriesElem, LaurentSeriesFieldElem}, x::RingElem)
+    K = base_ring(f)
+    ret = zero(K)
     for i in 0:(precision(f) - 1)-valuation(f)
-        ret += coeff(f, i+valuation(f))*(x^(i+valuation(f)))
+        ret += coeff(f, i+valuation(f))*(K(x)^(i+valuation(f)))
     end
-    return ret + O(base_ring(f), prime(base_ring(f))^precision(f))
+    return ret + O(K, prime(base_ring(f))^precision(f))
 end
 
 function LocalIntegral(F, tP, tQ)
@@ -1019,9 +1106,109 @@ end
 function LocalCoords(a, h, N, p, P, pts = [])
     if is_in_weierstrass_disk(a, h, P)
         return LocalCoordsW(a, h, N, p, P, pts)
+    elseif is_in_inf_disk(a, h, P)
+        return LocalCoordsInf(a, h, N, p, P, pts)
     else
         return LocalCoordsNonW(a, h, N, p, P, pts)
     end
+end
+
+# Inf
+# x coords of all pts should be cong to lambda mod p
+# so x coord of P / x coord of pts[i] is a 1-unit hence has an a-th root
+# so we normalize all given pts to have x coord same as P
+function LocalCoordsInfFancy(a, h, N, p, P, pts = [])
+    # below all we really need is the renormalised z-coord but we compute the points anyway for fun.
+    npts = [] # normalised points
+    for Q in pts
+        b = degree(h)
+        sc = root(P[1] // Q[1], a) # scale factor
+        if length(Q) == 3
+            push!(npts, (sc^a * Q[1], sc^b * Q[2], sc * Q[3]))
+        else
+            # probably the user supplied a point (x,y) so assume z = 1,
+            # hope that normalising fixes the valuation
+            push!(npts, (sc^a * Q[1], sc^b * Q[2], sc))
+        end
+    end
+    println(npts)
+    @assert valuation(discriminant(h)) == 0
+    K = base_ring(h)
+    @assert K.prec_max >= N
+    # TODO change to Laurent series once we have derivative
+    R,t = LaurentSeriesField(K, N, 't', cached=true)
+    #R,t = PowerSeriesRing(K, N, 't', cached=true, model=:capped_absolute)
+    # Initial approx
+    xt = R(K(P[1]))
+    zt = R(K(P[3])) + t
+    yt = R(K(P[2]))
+    x = gen(parent(h))
+    # Newton
+    correct_digits = 1
+    while correct_digits <= N
+        yt = (1//K(a))*(K(a-1)*yt + (reverse(h(P[1]*x))(zt^a))*inv(yt)^(a-1))
+        correct_digits *= 2
+    end
+    if length(pts) > 0
+        return (xt,yt,zt, [K(Q[3] - P[3]) for Q in npts])
+    end
+    return (xt,yt,zt)
+end
+
+
+# This is a different way of doing local coords, we take a lower-brow point of view
+# find l,k such that b l - a k = 1 ( as  gcd(a,b) = 1 ).
+# Then y has a pole of order b at infinity and x a poly of order a, hence
+# t = x^k / y^l is of pole order a k - b l = -1 so is a uniformizer.
+# now we solve for x,y using
+# y^a - h(x)
+# and
+# y^l * t - x^k
+# simultaneously using Newton, the iteration is
+#  [ - h'(x)       | a*y^(a-1)     ] ^ -1
+#  [ - k*x^(k-1)   | l*y^(l-1) * t ]
+function LocalCoordsInf(a, h, N, p, P, pts = [])
+    @assert valuation(discriminant(h)) == 0
+    K = base_ring(h)
+    b = degree(h)
+    _,l,k = gcdx(b,a)
+    lambda = lead(h)
+    k = -k
+    @assert b* l - a* k == 1
+    @assert K.prec_max >= N
+    # TODO change to Laurent series once we have derivative
+    R,t = LaurentSeriesField(K, N, 't', cached=true)
+    #R,t = PowerSeriesRing(K, N, 't', cached=true, model=:capped_absolute)
+    # Initial approx
+    xt = lambda^(-l)*t^(-a) #R(K(P[1]))
+    yt = lambda^(-k)*t^(-b) #R(K(P[2]))
+    # Newton
+    correct_digits = 1
+
+    # TODO maybe redo this with a vector xt,yt, vector f 
+    while correct_digits <= N
+        M = inv(matrix(R,2,2,[ -derivative(h)(xt), a*yt^(a-1),
+                              -k*xt^(k-1), l * yt^(l-1) * t]))
+
+        xtn = xt - (M[1,1]*(yt^a - h(xt)) + M[1,2]*(yt^l * t - xt^k))
+        ytn = yt - (M[2,1]*(yt^a - h(xt)) + M[2,2]*(yt^l * t - xt^k))
+        xt = xtn
+        yt = ytn
+        correct_digits *= 2
+    end
+    @assert xt^k == t * (yt^l)
+
+    if P != :inf
+        t0 = K(P[1])^k//K(P[2])^l
+    else
+        t0 = K(0)
+    end
+    xt = xt(t)
+    yt = yt(t)
+    if length(pts) > 0
+        return (xt,yt,t0, [K(Q[1])^k//K(Q[2])^l for Q in pts])
+    end
+    return (xt,yt,t0)
 end
 
 # Non-weierstrass
@@ -1029,7 +1216,9 @@ function LocalCoordsNonW(a, h, N, p, P, pts = [])
     @assert valuation(discriminant(h)) == 0
     K = base_ring(h)
     @assert K.prec_max >= N
-    R,t = PowerSeriesRing(K, N, 't', cached=true, model=:capped_absolute)
+    # TODO change to Laurent series once we have derivative
+    R,t = LaurentSeriesField(K, N, 't', cached=true)
+    #R,t = PowerSeriesRing(K, N, 't', cached=true, model=:capped_absolute)
     # Initial approx
     xt = R(P[1]) + t
     yt = R(P[2])
@@ -1040,9 +1229,9 @@ function LocalCoordsNonW(a, h, N, p, P, pts = [])
         correct_digits *= 2
     end
     if length(pts) > 0
-        return (xt,yt, [K(Q[1] - P[1]) for Q in pts])
+        return (xt,yt,K(0), [K(Q[1] - P[1]) for Q in pts])
     end
-    return (xt,yt)
+    return (xt,yt, K(0))
 end
 
 # Weierstrass
@@ -1050,7 +1239,9 @@ function LocalCoordsW(a, h, N, p, P, pts = [])
     K = base_ring(h)
     @assert !pos_val(K, discriminant(h))
     @assert K.prec_max >= N
-    R,t = PowerSeriesRing(K, N, 't', cached=true, model=:capped_absolute)
+    # TODO change to Laurent series once we have derivative
+    R,t = LaurentSeriesField(K, N, 't', cached=true)
+    #R,t = PowerSeriesRing(K, N, 't', cached=true, model=:capped_absolute)
     # Initial approx
     xt = R(P[1])
     yt = R(P[2]) + t
@@ -1062,9 +1253,9 @@ function LocalCoordsW(a, h, N, p, P, pts = [])
         correct_digits *= 2
     end
     if length(pts) > 0
-        return (xt,yt, [K(Q[2] - P[2]) for Q in pts])
+        return (xt,yt, K(0), [K(Q[2] - P[2]) for Q in pts])
     end
-    return (xt,yt)
+    return (xt,yt, K(0))
 end
 
 # TODO once nemo correctly reports valuation(0) this can be simplified
@@ -1072,10 +1263,17 @@ function pos_val(K, x)
     return valuation(K(x)) > 0 || K(x) == 0
 end
 
-# TODO or inf?
 function is_in_weierstrass_disk(a, h, P)
     K = base_ring(h)
     return pos_val(K, P[2])
+end
+
+function is_in_inf_disk(a, h, P)
+    K = base_ring(h)
+    if length(P) == 3
+        return pos_val(K, P[3]^degree(h)//P[2])
+    end
+    return pos_val(K, 1//P[2])
 end
 
 function in_same_disk(a, h, P, Q)
@@ -1083,48 +1281,166 @@ function in_same_disk(a, h, P, Q)
     return (pos_val(K, P[1] - Q[1]) && pos_val(K, P[2] - Q[2]))
 end
 
-function verify_pts(a, h, pts)
-    return all([p[2]^a == h(p[1]) for p in pts])
+function eval_homogeneous(a, h, x, z)
+   i = degree(h)
+   K = base_ring(h)
+   b = degree(h)
+   re = zero(K)
+   while i >= 0
+       re += coeff(h, i)*z^(a*(b-i))*x^(i)
+      i -= 1
+   end
+   return re
 end
 
-# returns a p-adic point (X,Y) on y^a = h(x) with x-coord x, using hensels lemma
-function lift_x(a, h, x, y = nothing)
+function verify_pt(a, h, pt)
+    if length(pt) == 2
+        return pt[2]^a == h(pt[1])
+    elseif length(pt) == 3
+        b = degree(h)
+        return (pt[2])^a == eval_homogeneous(a,h, pt[1], pt[3])
+    end
+    error("point badly formed")
+end
+
+function verify_pts(a, h, pts)
+    return all([verify_pt(a, h, p) for p in pts])
+end
+
+# returns a p-adic point (X,Y) on y^a = h(x) with x-coord X, using hensels lemma
+function lift_x(a, h, X, y = nothing)
     K = base_ring(h)
     N = K.prec_max
-    if y == nothing
-        y = K(lift_elem(root(GF(Int(prime(K)))(lift_elem(h(x))), a)))
+    if degree(K) == 1
+        R = GF(Int(prime(K)))
+    else
+        R,u = FlintFiniteField(prime(K),degree(K),"u")
     end
-    if is_in_weierstrass_disk(a,h,(x,y))
+    if y == nothing
+        y = K(lift_elem(root(R(lift_elem(h(X))), a)))
+    end
+    if is_in_weierstrass_disk(a,h,(X,y))
         error("not implemented")
     else
         # TODO: in fact this is the same newton iteration as above, can we simplify?
         correct_digits = 1
         while correct_digits <= N
-            y = (1//K(a))*(K(a-1)*y + (h(x))*inv(y)^(a-1))
+            y = (1//K(a))*(K(a-1)*y + (h(X))*inv(y)^(a-1))
             correct_digits *= 2
         end
     end
-    return (x,y)
+    return (X,y)
+end
+
+# returns a p-adic point (X,Y) on y^a = h(x) with y-coord Y, using hensels lemma
+function lift_y(a, h, Y, x = nothing)
+    K = base_ring(h)
+    N = K.prec_max
+    if x == nothing
+        #x = K(lift_elem(root(GF(Int(prime(K)))(lift_elem(h(X))), a)))
+        error("not implemented")
+    end
+    if !is_in_weierstrass_disk(a,h,(x,Y))
+        error("not implemented")
+    else
+        # TODO: in fact this is the same newton iteration as above, can we simplify?
+        correct_digits = 1
+        while correct_digits <= N
+            xn = x + (Y^a  - h(x))*inv(derivative(h)(x))
+            x = xn
+            correct_digits *= 2
+        end
+    end
+    return (x,Y)
+
+end
+
+# returns a p-adic point (X,Y,Z) on y^a = h(x,z) with z-coord Z, using hensels lemma
+function lift_z(a, h, Z, x, y)
+    K = base_ring(h)
+    N = K.prec_max
+    if x == nothing
+        #x = K(lift_elem(root(GF(Int(prime(K)))(lift_elem(h(X))), a)))
+        error("not implemented")
+    end
+    varxz = gen(parent(h))
+    H = reverse(h(x*varxz))(varxz)
+    if !is_in_inf_disk(a,h,(x,y,Z))
+        error("not implemented")
+    else
+        correct_digits = 1
+        while correct_digits <= N
+            xn = x + (y^a  - H(x))*inv(derivative(H)(x))
+            x = xn
+            correct_digits *= 2
+        end
+    end
+    return (x,Y)
+end
+
+function FormalTinyColemanIntegralMonomial(a, h, N, p, n, P, i, j; Q = nothing)
+    if Q == nothing
+        xt,yt,Pt = LocalCoords(a, h, N, p, P)
+    else
+        xt,yt,Pt,Qt = LocalCoords(a, h, N, p, P, [Q])
+    end
+    F = xt^i*derivative(xt)*inv(yt)^j
+    if Q == nothing
+        return F, Pt
+    else
+        return F, Pt, Qt[1] # only 1 point
+    end
 end
 
 function TinyColemanIntegralMonomial(a, h, N, p, n, P, Q, i, j)
     @assert in_same_disk(a, h, P, Q)
     K = base_ring(h)
-    xt,yt,Qt = LocalCoords(a, h, N, p, P, [Q])
-    Qt = Qt[1] # only 1 point
-    F = xt^i*derivative(xt)*inv(yt)^j
-    return LocalIntegral(F, K(0), Qt)
+    F,Pt,Qt = FormalTinyColemanIntegralMonomial(a, h, N, p, n, P, i, j; Q = Q)
+    return LocalIntegral(F, Pt, Qt)
 end
 
 function BasisMonomials(a, h)
     return  [(i,j) for j in 1:(a-1) for i in 0:(degree(h)-2)]
 end
 
-function TinyColemanIntegralsOnBasis(a, h, N, p, n, P, Q)
+function FormalTinyColemanIntegralsOnBasis(a::Int, h, N::Int, p::Int, n::Int, P::Tuple)
+    return [FormalTinyColemanIntegralMonomial(a, h, N, p, n, P, i, j) for (i,j) in BasisMonomials(a, h)]
+end
+
+function TinyColemanIntegralsOnBasis(a::Int, h, N::Int, p::Int, n::Int, P::Tuple, Q::Tuple)
     return elem_type(base_ring(h))[TinyColemanIntegralMonomial(a, h, N, p, n, P, Q, i, j) for (i,j) in BasisMonomials(a, h)]
 end
 
-function rational_pts(a, h, bound)
+#function rational_points(a, h::Nemo.Poly{Nemo.FinFieldElem})
+#    x = FlintQQ(0)
+#    ret = Tuple{fmpq,fmpq}[]
+#    while height(x) <= bound
+#        try
+#            y = root(h(x), a)
+#            push!(ret, (x,y))
+#            if a == 2
+#                push!(ret, (x,-y))
+#            end
+#        catch e
+#        end
+#        x = next_signed_minimal(x)
+#    end
+#    return ret
+#
+#    K = parent(r)
+#    u = gen(K)
+#    p = characteristic(K)
+#    n = degree(K)
+#    ui = [u^i for i in 0:(n-1)]
+#    for xp in collect(Base.product([1:Int(p) for i in 0:(n-1)]...))
+#        x = sum([xp[i] * ui[i] for i in 1:(n-1)])
+#        if root(
+#            return K(x)
+#        end
+#    end
+#end
+
+function rational_points(a, h::fmpq_poly, bound)
     x = FlintQQ(0)
     ret = Tuple{fmpq,fmpq}[]
     while height(x) <= bound
@@ -1141,19 +1457,143 @@ function rational_pts(a, h, bound)
     return ret
 end
 
-function ColemanIntegrals(a, h, N, p, n, x, y = :inf)
+# TODO wrap proper mult order functions from flint into nemo
+# for gfp also nmod?
+function multiplicative_order(a)
+    N = modulus(parent(a))
+    if a == 1
+        return 1
+    end
+    t = a
+    i = 1
+    while i < N && t != 1
+        t *= a
+        i+=1
+    end
+    return i
+end
+
+# returns the smallest extension of a padic field containing
+# all nth roots of unity.
+function Kmun(K, n)
+    T = ResidueRing(ZZ, ZZ(n))
+    p = prime(K)
+    # need n % p^m - 1
+    return FlintQadicField(prime(K), multiplicative_order(T(p)), K.prec_max)
+end
+
+# vector of Coleman functons I(P) = int_P^y in the disk around x
+function ColemanFunctions(a, h, N, p, n, x, y = :inf; frobact = nothing)
+    C = ColemanIntegrals(a, h, N, p, n, x, y; frobact = frobact)
+    actN = precision(C[1,1])
+    println(actN)
+    F,_ = FormalTinyColemanIntegralsOnBasis(a, h, actN, p, n, x)
+    #CastBaseMatrix(parent(C), matrix(base_ring(h), length(tinyints), 1, tinyints))
+    println("C: ",C)
+    println("F: ",F)
+    K = base_ring(F[1])
+
+    return [(K(lift_elem(C[i,1])) + O(K, prime(K))^precision(C[i,1])) + F[i] for i in 1:length(F)]
+end
+
+
+# Compute coleman ints of a divisor represented as X_1 + X_2 + X_3 ... - Y_1 - Y_2 - Y_3 - ...
+# if the second vector Y is unspecified defaults to infinity
+function ColemanIntegrals(a, h, N, p, n, x::Array, y = nothing; frobact = nothing)
+    if y == nothing
+        y = [:inf for P in x]
+    end
+    return sum([ColemanIntegrals(a, h, N, p, n, x[i], y[i], frobact = frobact) for i in 1:length(x)])
+end
+
+# TODO compute the frobenius action only once
+function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
+    println(x)
+    println(y)
     if y != :inf
+        # Decompose as two integrals, one x to infinity, one y to infinity
         A,B = ColemanIntegrals(a, h, N, p, n, x, :inf) , ColemanIntegrals(a, h, N, p, n, y, :inf)
         #@debug A,B
+        # original integral is difference of the above
         return A - B
+    else
+        if is_in_weierstrass_disk(a, h, x) # Weierstrass trick
+            l = divexact(ZZ(p^n - 1),ZZ(a))
+            K = Kmun(base_ring(h),l)
+            zeta = teichmuller(K(lift_elem(gen(FiniteField(prime(K), l, "w")[1]))))^l
+            ex = (p^l - 1)//(p^n - 1) # a gen of F_p^l to the ex power will gen F_p^n
+            hK = PolynomialRing(K, "x")(coefficients(h))
+            # TODO check this is always compatible, not always conway!! for large p
+
+            return [inv(zeta - 1)*b for b in TinyColemanIntegralsOnBasis(a, h, N, p, n, x, superelliptic_automorphism(a, h, p, n, x))]
+        else
+            M, C = AbsoluteFrobeniusActionOnLift(a, h, N, p, n, [x])
+            #@debug M
+
+            tinyints = TinyColemanIntegralsOnBasis(a, h, N, p, n, x, FrobeniusLift(a, h, p, x))
+
+            return inv(M - 1) * (C - CastBaseMatrix(parent(C), matrix(base_ring(h), length(tinyints), 1, tinyints)))
+        end
+    end
+end
+
+function weierstrassprep(f::Generic.RelSeries)
+    lowval = 2<<30
+    index = -1
+
+    for i in valuation(f):precision(f)
+        println(coeff(f, i),i)
+        if valuation(coeff(f, i)) < lowval
+            lowval = valuation(coeff(f, i))
+            index = i
+        end
+    end
+    println(index)
+    @assert lowval == 0
+    R,t = PolynomialRing(base_ring(f), 't')
+    g = zero(R)
+    g2 = zero(parent(f))
+    o = f
+    for i in 1:base_ring(f).prec_max
+        o = o//shift_right(o, index)
     end
 
-    M, C = AbsoluteFrobeniusActionOnLift(a, h, N, p, n, [x])
-    #@debug M
+    return (o, f//o)
+end
 
-    tinyints = TinyColemanIntegralsOnBasis(a, h, N, p, n, x, FrobeniusLift(a, h, p, x))
-    return inv(M - 1) * (C - CastBaseMatrix(parent(C), matrix(base_ring(h), length(tinyints), 1, tinyints)))
+function residue_field(R::FlintPadicField)
+    return GF(prime(R))
+end
 
+function residue_field(R::FlintQadicField)
+    return FiniteField(prime(R),degree(R))
+end
+
+# TODO compute frob as little as possible
+function Chabauty(a, h, N, p, n, jacobian_gens, res_disks = nothing)
+    K = base_ring(h)
+    if res_disks == nothing
+        kappa = residue_field(K)
+        Rb,x = PolynomialRing(kappa, "x")
+        hb = Rb(lift_elem(h))
+        res_disks = rational_points(a, hb)
+    end
+    r = length(jacobian_gens)
+    g = divexact(((a-1)*(degree(h)-1)),2)
+    Cols = [ColemanIntegrals(a, h, N, p, n, P, Q) for (P,Q) in jacobian_gens]
+    K2 = parent(Cols[1][1,1]) # probably this is K, but maybe diff prec
+    println(r,g)
+    colsmat = matrix(K2,[Cols[j][i,1] for j in 1:r, i in 1:2*g]) # TODO this is wrong, want regular only, which is some lower triangular piece
+    annih = nullspace(colsmat)
+    for Pb in res_disks
+        P = (K(lift_elem(Pb[1])), K(lift_elem(Pb[2])))
+        funcs = matrix(K, ColemanFunctions(a, h, N, p, n, P, :inf))
+        local_funcs = annih * funcs
+        println(local_funcs)
+
+
+    end
+    return annih
 end
 
 end # module
