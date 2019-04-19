@@ -1403,6 +1403,16 @@ function BasisMonomials(a, h)
     return  [(i,j) for j in 1:(a-1) for i in 0:(degree(h)-2)]
 end
 
+
+# Indices of the list from BasisMonomials which are regular 1-forms
+# See  Weierstrass Points on Cyclic Covers of the Projective Line - Christopher Towse : Proposition 2.
+function RegularIndices(a, h)
+    BM = BasisMonomials(a, h)
+    k = ceil(degree(h)//a)
+    e = k*a - degree(h)
+    return [n for n in 1:length(BM) if BM[n][1] < (k*BM[n][2] - 1 - floor(BM[n][2]*e//a))]
+end
+
 function FormalTinyColemanIntegralsOnBasis(a::Int, h, N::Int, p::Int, n::Int, P::Tuple)
     return [FormalTinyColemanIntegralMonomial(a, h, N, p, n, P, i, j) for (i,j) in BasisMonomials(a, h)]
 end
