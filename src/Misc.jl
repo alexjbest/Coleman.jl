@@ -20,6 +20,25 @@ function (R::Nemo.GaloisField)(x::fmpq)
     return R(numerator(x))//R(denominator(x))
 end
 
+function Nemo.order(x::FinFieldElem)
+    i = 1
+    pow = x
+    while pow != 1
+        pow *= x
+        i += 1
+    end
+    return i
+end
+
+#function gen(R::Nemo.GaloisField)
+#    a = rand(R)
+#    targ = modulus(R) - 1
+#    while order(a) != targ
+#        a = rand(R)
+#    end
+#    return a
+#end
+
 
 function (f::LaurentSeriesFieldElem)(x::LaurentSeriesFieldElem)
     @assert parent(f) == parent(x)
