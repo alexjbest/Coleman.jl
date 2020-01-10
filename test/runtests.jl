@@ -7,7 +7,7 @@ function test_zeta(a, h, inf_pts)
     print("zeta function y^",a,"=",h,"...")
 
     @test derivative(ZetaFunction(a, h))(ZZ(0)) == ZZ(count_points(a, h) + inf_pts)
-    g = subst(h,gen(parent(h))+12)
+    g = subst(h,2*gen(parent(h))+12)
     @test ZetaFunction(a, h) == ZetaFunction(a, g)
 
     println("PASS")
