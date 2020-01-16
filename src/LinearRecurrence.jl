@@ -212,9 +212,7 @@ function RetrieveInverses(prodInv,r_)
 end
 
 function Evaluate(M, x)
-    R = matrix(parent(x),
-               [ evaluate(M[i, j], x) for i = 1:nrows(M),j = 1:ncols(M)])
-    return R
+    return map(t->evaluate(t, x), M)
 end
 
 function ShiftEvaluationPre(alpha, beta, ddi_, d, RPol)
@@ -289,7 +287,7 @@ function ShiftEvaluation(partiali_, delta_, s, ddi_, d,
     #    (together with ShiftEvaluationPre)
     #
     R = base_ring(RPol)
-    p = RPol([ coeff(RPol(baseValues_[i]*partiali_[i]),0) for i in 1:(d+1) ])
+    p = RPol([ baseValues_[i]*partiali_[i] for i in 1:(d+1) ])
     q = p*s   # this multiplication accounts for roughly
     # 1/3 of all computation time spent in LinearRecurrence
     res_ = [ R(delta_[k+1]*coeff(q,d+k)) for k in 0:d ]
@@ -325,10 +323,10 @@ function Algorithm10_5(f, moduli_, Mij_)
     rem_ = [ f ]
     while (k > 0)
         remOld_ = rem_
-        rem_ = [ ]
+        rem_ = Array{Any, 1}(undef, 2*(n >> k))
         for i = 1:(n >> k)
-            rem_ = vcat(rem_, [ mod(remOld_[i], Mij_[k][2*i-1]),
-                               mod(remOld_[i], Mij_[k][2*i]) ])
+            rem_[2*i - 1] = mod(remOld_[i], Mij_[k][2*i-1])
+            rem_[2*i]     = mod(remOld_[i], Mij_[k][2*i])
         end
         k = k-1
     end
@@ -354,8 +352,8 @@ function Algorithm10_9(points_, cvalues_, Mij_)
              i in 1:k ]
     res_ = Mij_[k][2]*Algorithm10_9(points_[1:(n >> 1)],
                                    cvalues_[1:(n >> 1)], Mij1_) +
-    Mij_[k][1]*Algorithm10_9(points_[(n >> 1)+1:n],
-                            cvalues_[(n >> 1)+1:n], Mij2_)
+            Mij_[k][1]*Algorithm10_9(points_[(n >> 1)+1:n],
+                                    cvalues_[(n >> 1)+1:n], Mij2_)
     return res_
 end
 

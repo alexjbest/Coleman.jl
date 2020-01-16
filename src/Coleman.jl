@@ -1590,9 +1590,9 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
             for i in 1:n-1
                 push!(pts, FrobeniusLift(a, h, p, pts[end]))
             end
-            @info "pts",pts
+            #@info "pts",pts
             M, C = AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts)
-            @info "bigC",C
+            #@info "bigC",C
             #@info("tt")
             #@info M, C
             # C is the matrix ( f_i(P) | f_i(phi(P)) | --- | f_i(phi^{n-1}(P)) )
@@ -1600,20 +1600,20 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
             # get the q-power action see Remark 12 of Balakrishnan-Bradshaw-Kedlaya
             prodphiM = identity_matrix(M)
             CC = zero_matrix(base_ring(C), nrows(C), 1)
-            @info "M",M
-            @info "CC",CC
+            #@info "M",M
+            #@info "CC",CC
             frobMs = [M]
             for i in 1:n-1
                 push!(frobMs, map(frobenius,frobMs[end]))
             end
-            @info "frobM",frobMs
+            #@info "frobM",frobMs
             for t in n-1:-1:0
-                @info "t",t
-                @info "CC",CC
-                @info "M",prodphiM
-                @info "Ccol",C[1:nrows(C), t + 1]
-                @info "fM",map(frobenius,prodphiM)
-                @info "fCcol",map(frobenius, C[1:nrows(C), t + 1])
+                #@info "t",t
+                #@info "CC",CC
+                #@info "M",prodphiM
+                #@info "Ccol",C[1:nrows(C), t + 1]
+                #@info "fM",map(frobenius,prodphiM)
+                #@info "fCcol",map(frobenius, C[1:nrows(C), t + 1])
                 CC += prodphiM * map(x->frobenius(x, t), C[1:nrows(C), t + 1])#0 ? frobenius : x->x, C[1:nrows(C), t + 1])
                 prodphiM = prodphiM * frobMs[t + 1]
             end
@@ -1631,8 +1631,8 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
             #@info("M-1\n", M-1)
             #@info("diff:\n",C - CastBaseMatrix(parent(C), matrix(base_ring(h), length(tinyints), 1, tinyints)))
 
-            @info tinyints
-            @info inv(prodphiM - 1) * (CC - CastBaseMatrix(parent(CC), matrix(base_ring(h), length(tinyints), 1, tinyints)))
+            #@info tinyints
+            #@info inv(prodphiM - 1) * (CC - CastBaseMatrix(parent(CC), matrix(base_ring(h), length(tinyints), 1, tinyints)))
             return inv(prodphiM - 1) * (CC - CastBaseMatrix(parent(CC), matrix(base_ring(h), length(tinyints), 1, tinyints)))
         end
     end
