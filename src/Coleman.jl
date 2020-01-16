@@ -815,6 +815,7 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
 
 #   A rational function over FlintQQ
 #
+    (gcd(a,degree(hbar)) != 1) && error("The current implementation needs $a and the degree of $h to be coprime.")
     # Step 0: Setup
     p = convert(Int,characteristic(base_ring(hbar)))
     q = order(base_ring(hbar))
@@ -902,7 +903,7 @@ function Nemo.root(a::Union{Nemo.padic,Nemo.qadic}, n::Int)
         return exp(log(a)//n)
     catch
         K = parent(a)
-        R,x= PolynomialRing(K, "x")
+        R,x = PolynomialRing(K, "x")
         D =  Hecke.Hensel_factorization(x^n-a)
         return -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
     end
