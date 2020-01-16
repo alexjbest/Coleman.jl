@@ -323,7 +323,7 @@ function Algorithm10_5(f, moduli_, Mij_)
     rem_ = [ f ]
     while (k > 0)
         remOld_ = rem_
-        rem_ = Array{Any, 1}(undef, 2*(n >> k))
+        rem_ = Array{typeof(f), 1}(undef, 2*(n >> k))
         for i = 1:(n >> k)
             rem_[2*i - 1] = mod(remOld_[i], Mij_[k][2*i-1])
             rem_[2*i]     = mod(remOld_[i], Mij_[k][2*i])
