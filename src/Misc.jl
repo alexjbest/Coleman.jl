@@ -7,7 +7,7 @@ import AbstractAlgebra.Generic.PolyElem
 #    root(a::fmpq, n::Int)
 #> Given $x$ and in integer $n$, returns $\sqrt[n]{x}$ if it exists.
 #"""
-function Nemo.root(x::fmpq, n::Integer)
+function Nemo.root(x::fmpq, n::Int64)
    nnum = root(numerator(x), n)
    (nnum^n != numerator(x)) && throw(DomainError("Argument $x has no $n th root"))
    nden = root(denominator(x), n)
@@ -38,7 +38,7 @@ end
 #    end
 #    return a
 #end
-
+Base.log(a::fmpz) = log(BigInt(a))
 
 function (f::LaurentSeriesFieldElem)(x::LaurentSeriesFieldElem)
     @assert parent(f) == parent(x)

@@ -38,13 +38,16 @@ include("Misc.jl")
 #import AbstractAlgebra.Ring
 #import AbstractAlgebra.PolyRing
 #import AbstractAlgebra.Generic.LaurentSeriesFieldElem
-using Nemo
+using Nemo#, Hecke
 
 
-export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, TeichmullerPoint, lift_y, lift_x, verify_pt, verify_pts, count_points, rational_points, FrobeniusLift, padic_evaluate
+export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, TeichmullerPoint, lift_y, lift_x, verify_pt, verify_pts, count_points, rational_points, FrobeniusLift, padic_evaluate, BasisMonomials, RegularIndices, IsWeil
 
 # Some dumb useless to everyone else functions that let me use nmod as if it were padic
 function Nemo.frobenius(a::Union{Nemo.nmod, Generic.Res{fmpz}, SeriesElem, padic})
+    return a
+end
+function Nemo.frobenius(a::Union{Nemo.nmod, Generic.Res{fmpz}, SeriesElem, padic}, b::Int)
     return a
 end
 
@@ -145,6 +148,20 @@ function ScalarCoefficients(j, k, a, hk, p, q, N)
     return res_
 end
 
+function myinv(M)
+    de = det_df(M)
+    ad = zero(M)
+
+    for i in 1:nrows(M)
+        for j in 1:ncols(M)
+            ad[i,j] = (-1)^(i+j)*det_df(M[[q for q in 1:nrows(M) if q != i], [w for w in 1:nrows(M) if w != j]])
+        end
+    end
+
+    @assert inv(de)*transpose(ad)*M == 1
+    return inv(de)*transpose(ad)
+end
+
 function RSCombination(h)
 # returns polynomial sequences r_ and s_ such that
 # r_[i]h + s_[i]Derivative(h) = x^i
@@ -171,7 +188,10 @@ function RSCombination(h)
         end
     end
     try
-        Mi = inv(M)
+        Mi = myinv(M)
+        #@info ">>>>>>>>>>>>>>2"
+        #@info M
+        #@info Mi
     catch e
         _Mi, _d = pseudo_inv(lift(M))
         Mi = inv(R(_d)) * RMat(_Mi)
@@ -398,40 +418,27 @@ function HReduce(i, b, iota, mu_, genM, genD, M_, D_, p, R1ModH)
 
     # Note: #mu_ = b*k+1
     res[1,1] = mu_[end]   # Recall: mu_[r] = mu_{k,r+1,j}
-    #@debug "res"
-    #@debug res
+    ##@info "res"
+    ##@info res
 
     for l = (i+ length(mu_)):-1:1
         for m = 1:b-1
             res *= Evaluate(genM, R1(p*l-m))*inv(evaluate(genD, R1(p*l-m)))
         end
-        #@debug "res"
-        #@debug res
+        ##@info "res",res;
         res *= Evaluate(genM, R1(p*l-b))
-        #@debug "res"
-        #@debug res
+        ##@info "res",res;
         d = evaluate(genD, R1(p*l-b))
+        ##@info "d",d;
         res = R1ModH([ R1(lift_elem(divexact(res[1,m],d))) for m in 1:R1ModH.ncols ])
-        #@debug "res"
-        #@debug res
-        #@debug M_[l]
+        ##@info "res",res;
         res *= M_[l]
-        #@debug "res"
-        #@debug res
         res *= inv(D_[l])
-        #@debug "res"
-        #@debug res
         res *= Evaluate(genM, R1((l-1)*p))
-        #@debug "res"
-        #@debug res
         res *= inv(evaluate(genD,R1((l-1)*p)))
-        #@debug "res"
-        #@debug res
         if ((l-1)-i-1 >= 0)
             res[1,1] += mu_[(l-1)-i]
         end
-        #@debug "res"
-        #@debug res
     end
 
     return res
@@ -441,7 +448,7 @@ function VRedMatrixSeq(j, a, h, r_, s_, p, N, R1MatV, R1PolMatV, pts)
 # Given the data to compute the generic reduction matrix
 # (and its denominator) of the iota-th block,
 # return the matrix sequences needed for vertical reduction, i.e.
-# resM_[k] = M_V^{\iota}(k) and resD_[k] = "d_V^{\iota}(k)"
+## resM_[k] = M_V^{\iota}(k) and resD_[k] = "d_V^{\iota}(k)"
 #
     b = degree(h)
     R1 = base_ring(h)
@@ -455,8 +462,8 @@ function VRedMatrixSeq(j, a, h, r_, s_, p, N, R1MatV, R1PolMatV, pts)
     slr = floor(Int, log(4, R_[end]))
     DDi = UpperCaseDD(one(R1), R1(2^slr), 2^slr)
     DDi = inv(DDi)
-    #@debug "DDi"
-    #@debug DDi
+    #@info "DDi"
+    #@info DDi
 
     iota = Block(-p*j, a)
 
@@ -465,6 +472,7 @@ function VRedMatrixSeq(j, a, h, r_, s_, p, N, R1MatV, R1PolMatV, pts)
         for m = 1:b-1
             genM[i,m] = (a*t + iota-a)*coeff(r_[i], m-1) +
                   a*coeff(derivative(s_[i]), m-1)
+              #@info genM, coeff(r_[i], m-1), coeff(derivative(s_[i]), m-1)
         end
     end
     for m = 1:length(pts)
@@ -475,22 +483,28 @@ function VRedMatrixSeq(j, a, h, r_, s_, p, N, R1MatV, R1PolMatV, pts)
         genM[b-1+m, b-1+m] = (a*t +iota-a)*(pts[m][2])^(-a)
 
     end
-    #@debug "genM"
-    #@debug genM
+    #@info "genM"
+    #@info genM
+    #@info L_
+    #@info R_
+    #@info DDi
+    #@info slr
     resM_ = LinearRecurrence(transpose(genM), L_, R_, DDi, slr)
-    resM_ = [ transpose(resM_[m]) for m in 1:length(resM_) ]
+    #@info resM_
+    map!(transpose, resM_,resM_)
 
     genD = R1PolMat(a*t +iota-a)
-    #@debug "genD"
-    #@debug R_
-    #@debug L_
-    #@debug genD
+    #@info "genD"
+    #@info R_
+    #@info L_
+    #@info genD
     tempD_ = LinearRecurrence(transpose(genD), L_, R_, DDi, slr)
-    #@debug tempD_
-    tempD_ = [ transpose(tempD_[m]) for m in 1:length(tempD_) ]
-    #@debug tempD_
+    #@info tempD_
+    map!(transpose, tempD_, tempD_)
+    #@info tempD_
     resD_ = [ tempD_[k][1,1] for k in 1:N ]
-    #@debug resD_
+    #@info resM_
+    #@info resD_
 
     return resM_, resD_
 end
@@ -505,25 +519,24 @@ function VReduce(i, j, a, h, wH_, M_, D_, R1ModV)
     b = degree(h)
     N = length(wH_)
 
-    #@debug wH_
     res = R1ModV([ wH_[N][j][i+1][1,m] for m in 2:R1ModV.ncols+1 ])
-    #@debug res
+    #@info res
 
     for k = (N-1):-1:1
         res *= M_[k+1]
         d = D_[k+1]
-        #@debug d
+        ##@info d
         res = R1ModV([ R1(lift_elem(divexact(res[1,m], d))) for m in 1:R1ModV.ncols ])
-        #@debug res
+        ##@info res
         # Add new term
         res = R1ModV([ wH_[k][j][i+1][1,m] + res[1,m-1] for m in 2:R1ModV.ncols+1 ])
-        #@debug res
+        ##@info res
     end
 
     res *= M_[1]
-    #@debug "M",M_[1]
+    #@info "M_",M_[1]
     res *= inv(D_[1])
-    #@debug "D",D_[1]
+    #@info "D_",D_[1]
 
     return res
 end
@@ -567,7 +580,7 @@ function AbsoluteFrobeniusAction(a, hbar, N, pts = [])
 
 
     h = lift_fq_to_qadic_poly(R1Pol, hbar)
-    #@debug h
+    #@info h
 
     return AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts)
 end
@@ -639,7 +652,7 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
 
     Rt,t3 = PolynomialRing(FlintZZ,'t')
     h = cast_poly_nmod(R1Pol,h)
-    #@debug h
+    #@info h
 
     pts = [(R1(lift_elem(P[1])),R1(lift_elem(P[2]))) for P in pts]
 
@@ -679,8 +692,8 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
         slr = floor(Int, log(4, R_[end]))
         DDi = UpperCaseDD(one(R0), R0(2^slr), 2^slr)
         DDi = inv(DDi)
-        #@debug "DDi"
-        #@debug DDi
+        #@info "DDi"
+        #@info DDi
 
         for j = 1:a-1
             # j and k fix the row index
@@ -697,28 +710,28 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
 
             # generic reduction matrix
             genM, genD = HRedMatrix(t, iota, a, h, R1PolMatH, pts)
-            #@debug "gen"
-            #@debug genM,genD
+            #@info "genM"
+            #@info genM,genD
 
             # reduction matrix sequences: evaluation
             M_, D_ = HRedMatrixSeq(genM, genD, L_, R_, DDi, slr,
                                    p, N, B, Vi, R1MatH, R0PolMatH)
-            #@debug "M_"
-            #@debug M_,D_
+            ##@info "M_"
+            ##@info M_,D_
 
             # approximate frobenius action
             mu_ = ScalarCoefficients(j, k, a, hk, p, q, N)
-            #@debug "Mu_"
-            #@debug mu_
+            #@info "Mu_"
+            #@info mu_
 
             # reduce
             wH_[k+1][j] = [ HReduce(i, b, iota, mu_, genM, genD, M_,
                                     D_, p, R1ModH) for i in 0:(b-2) ]
         end
         hk *= hFrob
-        #@debug "wH_"
-        #@debug wH_
     end
+    #@info "wH_"
+    #@info wH_
 
 
     # Step 2: Vertical reduction
@@ -737,22 +750,22 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
     # compute the r_i and s_i needed to define the
     # vertical reduction matrices
     r_, s_ = RSCombination(h)
-    #@debug "RS"
-    #@debug r_,s_
+    #@info "RS"
+    #@info r_,s_
 
     for j = 1:a-1
         # reduction matrix sequences: evaluation
         M_, D_ = VRedMatrixSeq(j, a, h, r_, s_, p, N,
                                 R1MatV, R1PolMatV, pts)
-        #@debug "MD"
-        #@debug M_
-        #@debug "MD"
-        #@debug D_
+        #@info "MD"
+        #@info M_
+        #@info "MD"
+        #@info D_
 
         # reduce
         wV_[j] = [ VReduce(i, j, a, h, wH_, M_, D_, R1ModV) for i in 0:(b-2) ]
-        #@debug wV_
     end
+    #@info "wV_", wV_
 
     # Step 3: Assemble output
     R0Mat = MatrixSpace(R0, (a-1)*(b-1), (a-1)*(b-1))
@@ -764,6 +777,8 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
             end
         end
     end
+    #@info "res"
+    #@info res
     @assert res != 0
 
     # Return just the matrix of frobenius if we have no points
@@ -810,7 +825,8 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     bound = n*g/2 + 2*g*log(p,2)
     # N is the first integer strictly larger than bound
     N = floor(Int, bound+1)
-    #@debug N
+    #@info(N)
+    #@info N
 
     # Step 2: Determine absolute Frobenius action mod precision
     M = AbsoluteFrobeniusAction(a, hbar, N)
@@ -818,12 +834,8 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     # Step 3: Determine Frobenius action mod precision
     MM = deepcopy(M)
     for i in 1:n-1
-        # Apply Frobenius to MM
-        for j = 1:nrows(MM)
-            for k = 1:ncols(MM)
-                MM[j, k] = frobenius(MM[j, k])
-            end
-        end
+        # Apply Frobenius to MM TODO make this a nice function
+        map!(frobenius, MM, MM)
         # Multiply
         M = M * MM
     end
@@ -876,17 +888,24 @@ function IsWeil(P, sqrtq)
 end
 
 function Nemo.root(a::Union{Nemo.padic,Nemo.qadic}, n::Int)
-    if valuation(a) != 0
-        if valuation(a) % n == 0
-            K = parent(a)
-            N = divexact(valuation(a), n)
-            uniformizer = K(prime(K))
-            return exp(log(a//(uniformizer^valuation(a)))//n)*uniformizer^N
-        else
-            error("no root over ground field")
+    try
+        if valuation(a) != 0
+            if valuation(a) % n == 0
+                K = parent(a)
+                N = divexact(valuation(a), n)
+                uniformizer = K(prime(K))
+                return exp(log(a//(uniformizer^valuation(a)))//n)*uniformizer^N
+            else
+                error("no root over ground field")
+            end
         end
+        return exp(log(a)//n)
+    catch
+        K = parent(a)
+        R,x= PolynomialRing(K, "x")
+        D =  Hecke.Hensel_factorization(x^n-a)
+        return -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
     end
-    return exp(log(a)//n)
 end
 
 function Nemo.root(r::Nemo.gfp_elem, a::Int)
@@ -936,6 +955,24 @@ function count_points(a::Int, h::PolyElem{Nemo.gfp_elem})
     return su
 end
 
+function count_points(a::Int, h::PolyElem{<:Nemo.FinFieldElem})
+    K = base_ring(h)
+    N = gcd(Int(order(K)) - 1, a)
+    su = 0
+    for x in K
+        try
+            y = root(h(x), a)
+            if y == 0
+                su += 1
+            else
+                su += N
+            end
+        catch
+        end
+    end
+    return su
+end
+
 function rational_points(a::Int, h::PolyElem{Nemo.gfp_elem})
     K = base_ring(h)
     N = gcd(Int(characteristic(K)) - 1, a)
@@ -971,17 +1008,17 @@ function FrobeniusLift(a::Int, h, p::Int, P::Tuple{Any,Any}, m = 1)
     # TODO only padic rn I gues?
     K = base_ring(h)
     P = (K(P[1]), K(P[2]))
-    return ((P[1])^p,
-            P[2]^p * root(1 + (frobenius(h)(P[1]^p) - h(P[1])^p)//(P[2]^(a*p)), a))
+    return (frobenius((P[1])^p, degree(K) - 1),
+            frobenius(P[2]^p * root(1 + (frobenius(h)(P[1]^p) - h(P[1])^p)//(h(P[1])^p), a), degree(K) - 1))
 
 end
 
-function TeichmullerPoint(a::Int, h, p::Int, P::Tuple{Any, Any})
+function TeichmullerPoint(a::Int, h, p::Int, n::Int, P::Tuple{Any, Any})
     old = new = P
     old = (old[1] + 1, old[2])
     while old != new
         old = new
-        new = FrobeniusLift(a, h, p, new)
+        new = FrobeniusLift(a, h, p, new, n)
     end
 
     return new
@@ -1466,7 +1503,7 @@ function rational_points(a, h::fmpq_poly, bound)
     ret = Tuple{fmpq,fmpq}[]
     while height(x) <= bound
         try
-            y = root(h(x), a)
+            y = Coleman.root(h(x), a)
             push!(ret, (x,y))
             if a == 2
                 push!(ret, (x,-y))
@@ -1524,12 +1561,16 @@ function ColemanIntegrals(a, h, N, p, n, x::Array, y = nothing; frobact = nothin
     return sum([ColemanIntegrals(a, h, N, p, n, x[i], y[i], frobact = frobact) for i in 1:length(x)])
 end
 
+function ColemanIntegrals(a, h, N, p, n, y::Symbol, x::Tuple; frobact = nothing)
+    return -ColemanIntegrals(a, h, N, p, n, x, y, frobact = frobact)
+end
+
 # TODO compute the frobenius action only once
 function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
     if y != :inf
         # Decompose as two integrals, one x to infinity, one y to infinity
         A,B = ColemanIntegrals(a, h, N, p, n, x, :inf) , ColemanIntegrals(a, h, N, p, n, y, :inf)
-        #@debug A,B
+        #@info A,B
         # original integral is difference of the above
         return A - B
     else
@@ -1545,12 +1586,54 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
 
             return [get_padic(inv(zeta - 1)*b) for b in TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK)]
         else
-            M, C = AbsoluteFrobeniusActionOnLift(a, h, N, p, n, [x])
-            #@debug M
+            pts = [x]
+            for i in 1:n-1
+                push!(pts, FrobeniusLift(a, h, p, pts[end]))
+            end
+            @info "pts",pts
+            M, C = AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts)
+            @info "bigC",C
+            #@info("tt")
+            #@info M, C
+            # C is the matrix ( f_i(P) | f_i(phi(P)) | --- | f_i(phi^{n-1}(P)) )
 
-            tinyints = TinyColemanIntegralsOnBasis(a, h, N, p, n, x, FrobeniusLift(a, h, p, x))
+            # get the q-power action see Remark 12 of Balakrishnan-Bradshaw-Kedlaya
+            prodphiM = identity_matrix(M)
+            CC = zero_matrix(base_ring(C), nrows(C), 1)
+            @info "M",M
+            @info "CC",CC
+            frobMs = [M]
+            for i in 1:n-1
+                push!(frobMs, map(frobenius,frobMs[end]))
+            end
+            @info "frobM",frobMs
+            for t in n-1:-1:0
+                @info "t",t
+                @info "CC",CC
+                @info "M",prodphiM
+                @info "Ccol",C[1:nrows(C), t + 1]
+                @info "fM",map(frobenius,prodphiM)
+                @info "fCcol",map(frobenius, C[1:nrows(C), t + 1])
+                CC += prodphiM * map(x->frobenius(x, t), C[1:nrows(C), t + 1])#0 ? frobenius : x->x, C[1:nrows(C), t + 1])
+                prodphiM = prodphiM * frobMs[t + 1]
+            end
 
-            return inv(M - 1) * (C - CastBaseMatrix(parent(C), matrix(base_ring(h), length(tinyints), 1, tinyints)))
+
+            #@info(x)
+            #@info(FrobeniusLift(a, h, p, x, n))
+            tinyints = TinyColemanIntegralsOnBasis(a, h, N, p, n, x, FrobeniusLift(a, h, p, x, n))
+            #@info("ti: \n",tinyints)
+            #@info("C: \n",C)
+            #@info("M\n", trace(M))
+            #@info("M-1\n", M-1)
+            #@info("inv(M-1)\n", inv(M-1))
+            #@info("inv(M-1)C\n", inv(M-1)*C)
+            #@info("M-1\n", M-1)
+            #@info("diff:\n",C - CastBaseMatrix(parent(C), matrix(base_ring(h), length(tinyints), 1, tinyints)))
+
+            @info tinyints
+            @info inv(prodphiM - 1) * (CC - CastBaseMatrix(parent(CC), matrix(base_ring(h), length(tinyints), 1, tinyints)))
+            return inv(prodphiM - 1) * (CC - CastBaseMatrix(parent(CC), matrix(base_ring(h), length(tinyints), 1, tinyints)))
         end
     end
 end
@@ -1631,11 +1714,11 @@ function Chabauty(a, h, N, p, n, jacobian_gens, res_disks = nothing)
         K2 = parent(Cols[1][1,1]) # probably this is K, but maybe diff prec
     end
     RI = RegularIndices(a, h)
-    println(Cols)
+    #@info(Cols)
     colsmat = matrix(K2,[Cols[j][i,1] for j in 1:length(jacobian_gens), i in RI])
-    println(colsmat)
+    #@info(colsmat)
     _,annih = nullspace(colsmat)
-    println("aani",annih)
+    #@info("aani",annih)
     pts = []
     for Pb in res_disks
         P = lift_point(a, h, K(lift_elem(Pb[1])), K(lift_elem(Pb[2])))
@@ -1645,11 +1728,11 @@ function Chabauty(a, h, N, p, n, jacobian_gens, res_disks = nothing)
         Kf = base_ring(regcfs[1])
         local_ann_funcs = [sum([(Kf(lift_elem(annih[i,j])) + O(Kf, p^precision(annih[i,j])))*regcfs[i] for i in 1:g]) for j in 1:ncols(annih)]
         if sum([sum([valuation(coeff(l,i)) for i in 0:precision(l)-1]) for l in local_ann_funcs]) > 0 || true
-            println(P)
-            println("lafs ", local_ann_funcs)
-            println("lafs ", [[valuation(coeff(l,i)) for i in 0:precision(l)-1] for l in local_ann_funcs])
-            println("nr ", [strassman_num_roots(f) for f in local_ann_funcs])
-            println("\n\n")
+            #@info(P)
+            #@info("lafs ", local_ann_funcs)
+            #@info("lafs ", [[valuation(coeff(l,i)) for i in 0:precision(l)-1] for l in local_ann_funcs])
+            #@info("nr ", [strassman_num_roots(f) for f in local_ann_funcs])
+            #@info("\n\n")
         end
     end
     return pts
