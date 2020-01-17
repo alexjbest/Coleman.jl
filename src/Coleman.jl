@@ -38,7 +38,7 @@ include("Misc.jl")
 #import AbstractAlgebra.Ring
 #import AbstractAlgebra.PolyRing
 #import AbstractAlgebra.Generic.LaurentSeriesFieldElem
-using Nemo#, Hecke
+using Nemo, Hecke
 
 
 export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, TeichmullerPoint, lift_y, lift_x, verify_pt, verify_pts, count_points, rational_points, FrobeniusLift, padic_evaluate, BasisMonomials, RegularIndices, IsWeil
@@ -1006,7 +1006,6 @@ function FrobeniusLift(a::Int, h, p::Int, P::Tuple{Any,Any}, m = 1)
     if m != 1 # apply recursively
         return FrobeniusLift(a, h, p, FrobeniusLift(a, h, p, P, m - 1), 1)
     end
-    # TODO only padic rn I gues?
     K = base_ring(h)
     P = (K(P[1]), K(P[2]))
     return (frobenius((P[1])^p, degree(K) - 1),
