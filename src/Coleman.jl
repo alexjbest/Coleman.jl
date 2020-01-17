@@ -815,7 +815,7 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
 
 #   A rational function over FlintQQ
 #
-    (gcd(a,degree(hbar)) != 1) && error("The current implementation needs $a and the degree of $h to be coprime.")
+    (gcd(a,degree(hbar)) != 1) && error("The current implementation needs $a and the degree of $hbar to be coprime.")
     # Step 0: Setup
     p = convert(Int,characteristic(base_ring(hbar)))
     q = order(base_ring(hbar))
