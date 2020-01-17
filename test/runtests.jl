@@ -98,7 +98,7 @@ function cubic_number_field_ex()
 end
 
 function quartic_number_field_ex()
-    # LMFDB ecnf 4.4.725.1-89.1-a2
+    # LMFDB ecnf 4.4.725.1-16.1-a1
     A = 2
     K = QadicField(43,4,7)
     R,x = PolynomialRing(K, "x")
