@@ -62,7 +62,7 @@ function cast_poly_nmod(R, e)
     RR = base_ring(R)
     # If K/L with L prime, then RR is the UnramifiedQuotientRing(L,N)
     # If R is not a polynomial ring, then (RR eq RRR)
-    res_ = [zero(RR) for i in 1:(degree(e) + 1)]
+    res_ = Vector{elem_type(RR)}(undef, degree(e) + 1)#[zero(RR) for i in 1:(degree(e) + 1)]
     for i = 0:degree(e)
         res_[i+1] = RR(lift_elem(coeff(e,i)))
     end
@@ -117,14 +117,37 @@ function LowerCaseDD(alpha,beta,d)
     #    Returns the element dd(alpha,beta,d) of R
     #
     res = beta
-    for i = 2:d
-        res = res*i
-    end
+    #for i = 2:d
+    #    j = j * i
+    #    #res = res * i
+    #    @assert 
+    #end
+    res = beta * factorial(fmpz(d))
     for i = -d:d
-        res = res*(alpha + i*beta)
+      t = parent(beta)(i)
+      t = mul!(t, t, beta)
+      t = add!(t, alpha, t)
+      res = mul!(res, res, t)
     end
     return res
 end
+
+function add!(z::fmpq_abs_series, a::fmpq_abs_series, b::fmpq_abs_series)
+   lena = length(a)
+   lenb = length(b)
+
+   prec = min(a.prec, b.prec)
+
+   lena = min(lena, prec)
+   lenb = min(lenb, prec)
+
+   lenz = max(lena, lenb)
+   ccall((:fmpq_poly_add_series, :libflint), Nothing,
+                (Ref{fmpq_abs_series}, Ref{fmpq_abs_series}, Ref{fmpq_abs_series}, Int),
+               z, a, b, lenz)
+   return z
+end
+
 
 function LowerCaseDD_(alpha, beta, d)
     #    Return all factors of dd(alpha,beta,d)
@@ -140,14 +163,22 @@ function LowerCaseDD_(alpha, beta, d)
     #    Returns a sequence whose entries are the factors of dd(alpha,beta,d)
     #    ordered as before Theorem 5
     #
-    res_ = [parent(beta)(0) for i in 1:(3*d + 1)]
+    R = parent(beta)
+    res_ = Vector{elem_type(R)}(undef, 3*d + 1)#[parent(beta)(0) for i in 1:(3*d + 1)]
     res_[1] = beta
     for i = 2:d
-        res_[i] = parent(beta)(i)
+        res_[i] = R(i)
     end
-    for i = -d:d
-        res_[2*d+1+i] = alpha + i*beta
+
+    if d > 1
+      res_[2 * d + 1 - d] = alpha - res_[d] * beta
+    else
+      res_[2 * d + 1 - d] = alpha - R(1) * beta
     end
+    for i = (-d + 1):d
+      res_[2*d+1+i] = res_[2*d + 1 + (i - 1)] + beta# i*beta
+    end
+
     return res_
 end
 
@@ -167,12 +198,14 @@ function UpperCaseDD_(alpha, beta, k)
     #    Returns a sequence whose entries are the factors of D(alpha, beta, k) as
     #    defined before Lemma 6
     #
-    k_ = [ k ]
-    while k_[length(k_)] > 1
-        push!(k_, (k_[length(k_)] >> 1))
+    k_ = Int[ k ]
+    while k_[end] > 1
+        push!(k_, (k_[end] >> 1))
     end
 
-    res_ = [parent(alpha)(0) for i in 1:2*(length(k_)-1)]
+    R = parent(alpha)
+
+    res_ = Vector{elem_type(R)}(undef, 2 * (length(k_) - 1))
     for i = 1:(length(k_)-1)
         res_[2*i-1] = LowerCaseDD(beta*(k_[i+1]+1),beta,k_[i+1])
         res_[2*i] = LowerCaseDD(alpha*k_[i+1],beta,k_[i+1])
@@ -193,20 +226,23 @@ function RetrieveInverses(prodInv,r_)
     #    A sequence inv_ such that inv_[i] = r_[i]^{-1}
     #
     if (length(r_) == 0)
-        return [prodInv]
+        return typeof(prodInv)[prodInv]
     end
-    rProd = [parent(r_[1])(0) for i in 1:length(r_)]
+    R = parent(r_[1])
+    #rProd = [parent(r_[1])(0) for i in 1:length(r_)]
+    rProd = Vector{elem_type(R)}(undef, length(r_))
     rProd[1] = r_[1]
     for i = 2:length(r_)
         rProd[i] = r_[i]*rProd[i-1]
     end
-    inv_ = [parent(prodInv)(0) for i in 1:length(r_)]
-    inv_[length(r_)] = prodInv
+    #inv_ = [parent(prodInv)(0) for i in 1:length(r_)]
+    inv_ = Vector{elem_type(R)}(undef, length(r_))
+    inv_[length(r_)] = deepcopy(prodInv)
     for i = (length(r_)-1):-1:1
         inv_[i] = r_[i+1]*inv_[i+1]
     end
     for i = 2:length(r_)
-        inv_[i] = rProd[i-1]*inv_[i]
+        inv_[i] = mul!(inv_[i], inv_[i], rProd[i-1])
     end
     return inv_
 end
@@ -234,30 +270,35 @@ function ShiftEvaluationPre(alpha, beta, ddi_, d, RPol)
     #    delta(a, i-1, d) as in BGS07, Lemma 2
     #
     R = base_ring(RPol)
-    partiali_ = [zero(R) for i in 1:(d + 1)]
-    partiali_[1] =  one(R)
+    #partiali_ = [zero(R) for i in 1:(d + 1)]
+    partiali_ = Vector{elem_type(R)}(undef, d + 1)
+    partiali_[1] = one(R)
     for i = 2:d
-        partiali_[1] = ddi_[i]*partiali_[1]
+        partiali_[1] = mul!(partiali_[1], partiali_[1],  ddi_[i])
     end
     if (ModByPowerOf2(d,1) == 1)
         partiali_[1] = -partiali_[1]
     end
     partiali_[2] = -d*partiali_[1]
     for i = 3:d+1
-        partiali_[i] = ((i-1)-d-1)*ddi_[i-1]*partiali_[i-1]
+        partiali_[i] = R((i-1)-d-1)
+        partiali_[i] = mul!(partiali_[i], partiali_[i], ddi_[i-1])
+        partiali_[i] = mul!(partiali_[i], partiali_[i], partiali_[i-1])
     end
 
     a = alpha*ddi_[1]
-    delta_ = [zero(R) for i in 1:(d + 1)]
+    delta_ = Vector{elem_type(R)}(undef, d + 1)
     delta_[1] =  one(R)
     for i = 0:d
-        delta_[1] = delta_[1]*(a-i)
+        delta_[1] = mul!(delta_[1], delta_[1], a - i)
     end
     for i = 2:d+1
-        delta_[i] = (a+i-1)*(ddi_[d+i-1]*beta)*delta_[i-1]
+      delta_[i] = (a+i-1)*(ddi_[d+i-1])
+      delta_[i] = mul!(delta_[i], delta_[i], beta)
+      delta_[i] = mul!(delta_[i], delta_[i], delta_[i-1])
     end
 
-    s = RPol([ ddi_[d+i]*beta for i in 1:(2*d+1) ])
+    s = RPol(elem_type(R)[ ddi_[d+i]*beta for i in 1:(2*d+1) ])
 
     return partiali_, delta_, s
 end
@@ -287,22 +328,22 @@ function ShiftEvaluation(partiali_, delta_, s, ddi_, d,
     #    (together with ShiftEvaluationPre)
     #
     R = base_ring(RPol)
-    p = RPol([ baseValues_[i]*partiali_[i] for i in 1:(d+1) ])
+    p = RPol(elem_type(R)[ baseValues_[i]*partiali_[i] for i in 1:(d+1) ])
     q = p*s   # this multiplication accounts for roughly
     # 1/3 of all computation time spent in LinearRecurrence
-    res_ = [ R(delta_[k+1]*coeff(q,d+k)) for k in 0:d ]
+    res_ = elem_type(R)[ R(delta_[k+1]*coeff(q,d+k)) for k in 0:d ]
 
     return res_
 end
 
-function Algorithm10_3(moduli_, k)
+function Algorithm10_3(moduli_::Vector{T}, k) where {T}
     #    Implements [3, Algorithm 10.3]
     #
     #    NOTE: #moduli_ = 2^k
     #
     n = length(moduli_)
-    res_ = [[] for i in 1:k+1]
-    res_[1] = [ moduli_[j] for j in 1:n]
+    res_ = Vector{T}[T[] for i in 1:k+1]
+    res_[1] = T[ moduli_[j] for j in 1:n]
     for i = 2:k+1
         for j = 1:(n >> (i-1))
             push!(res_[i], res_[i-1][2*j-1]*res_[i-1][2*j])
@@ -320,21 +361,21 @@ function Algorithm10_5(f, moduli_, Mij_)
     #
     n = length(moduli_)
     k = length(Mij_) -1
-    rem_ = [ f ]
+    rem_ = typeof(f)[ f ]
     while (k > 0)
         remOld_ = rem_
-        rem_ = Array{typeof(f), 1}(undef, 2*(n >> k))
+        rem_ = Vector{typeof(f)}(undef, 2*(n >> k))
         for i = 1:(n >> k)
             rem_[2*i - 1] = mod(remOld_[i], Mij_[k][2*i-1])
             rem_[2*i]     = mod(remOld_[i], Mij_[k][2*i])
         end
         k = k-1
     end
-    res_ = [ coeff(rem_[i],0) for i in 1:length(rem_) ]
+    res_ = elem_type(base_ring(parent(f)))[ coeff(rem_[i],0) for i in 1:length(rem_) ]
     return res_
 end
 
-function Algorithm10_9(points_, cvalues_, Mij_)
+function Algorithm10_9(points_, cvalues_, Mij_, RPol)
     #    Implements [3, Algorithm 10.9]
     #
     #    NOTE:
@@ -343,21 +384,21 @@ function Algorithm10_9(points_, cvalues_, Mij_)
     #
     k = length(Mij_) -1
     if (k == 0)
-        return cvalues_[1]
+        return RPol(cvalues_[1])
     end
 
     n = length(points_)
-    Mij1_ = [ Mij_[i][1:(n >> i)] for i in 1:k ]
-    Mij2_ = [ Mij_[i][(n >> i)+1:(n >> (i-1))] for
+    Mij1_ = eltype(Mij_)[ Mij_[i][1:(n >> i)] for i in 1:k ]
+    Mij2_ = eltype(Mij_)[ Mij_[i][(n >> i)+1:(n >> (i-1))] for
              i in 1:k ]
     res_ = Mij_[k][2]*Algorithm10_9(points_[1:(n >> 1)],
-                                   cvalues_[1:(n >> 1)], Mij1_) +
+                                   cvalues_[1:(n >> 1)], Mij1_, RPol) +
             Mij_[k][1]*Algorithm10_9(points_[(n >> 1)+1:n],
-                                    cvalues_[(n >> 1)+1:n], Mij2_)
+                                    cvalues_[(n >> 1)+1:n], Mij2_, RPol)
     return res_
 end
 
-function MatrixAPEvaluationPre(k, alpha, beta, DDi_, RPol)
+function MatrixAPEvaluationPre(k, alpha::T, beta, DDi_, RPol) where {T}
     #    Implements precomputations for [1, Theorem 8]
     #
     #    INPUT:
@@ -379,31 +420,33 @@ function MatrixAPEvaluationPre(k, alpha, beta, DDi_, RPol)
     #    and a sequence of polynomials s1_ over R (and the same with
     #    2 instead of 1)
     #
-    k_ = [ k ]             			# k_[i] = k_{i-1}
-    while k_[length(k_)] > 1              # k_[1] = k_0 = k
-        push!(k_, k_[length(k_)] >> 1)
+    k_ = Int[ k ]             			# k_[i] = k_{i-1}
+    while k_[end] > 1              # k_[1] = k_0 = k
+        push!(k_, k_[end] >> 1)
     end
     logk = length(k_)-1				# = Floor(Log(2,k))
 
-    ddi1__ = [typeof(alpha)[] for i in 1:logk]
-    partiali1__ = [typeof(alpha)[] for i in 1:logk]
-    delta1__ = [typeof(alpha)[] for i in 1:logk]
-    s1_ = [RPol(0) for i in 1:logk]
-    ddi2__ = [typeof(alpha)[] for i in 1:logk]
-    partiali2__ = [typeof(alpha)[] for i in 1:logk]
-    delta2__ = [typeof(alpha)[] for i in 1:logk]
-    s2_ = [RPol(0) for i in 1:logk]
+    ddi1__ = Vector{Vector{T}}(undef, logk)#[typeof(alpha)[] for i in 1:logk]
+    partiali1__ = Vector{Vector{T}}(undef, logk)#[typeof(alpha)[] for i in 1:logk]
+    delta1__ = Vector{Vector{T}}(undef, logk)#[typeof(alpha)[] for i in 1:logk]
+    s1_ = Vector{elem_type(RPol)}(undef, logk)
+    ddi2__ = Vector{Vector{T}}(undef, logk)
+    partiali2__ = Vector{Vector{T}}(undef, logk)
+    delta2__ = Vector{Vector{T}}(undef, logk)
+    s2_ = Vector{elem_type(RPol)}(undef, logk)
     for i = logk:-1:1
         d = k_[i+1]
-        dd1_ = LowerCaseDD_((k_[i+1]+1)*beta, beta, d)
+        tbeta = (d + 1) * beta
+        talpha = d * alpha
+        dd1_ = LowerCaseDD_(tbeta, beta, d)
         ddi1__[i] = RetrieveInverses(DDi_[2*i-1], dd1_)
-        dd2_ = LowerCaseDD_(k_[i+1]*alpha, beta, d)
+        dd2_ = LowerCaseDD_(talpha, beta, d)
         ddi2__[i] = RetrieveInverses(DDi_[2*i], dd2_)
         partiali1__[i], delta1__[i], s1_[i] =
-        ShiftEvaluationPre((k_[i+1]+1)*beta, beta, ddi1__[i],
+        ShiftEvaluationPre(tbeta, beta, ddi1__[i],
                            k_[i+1], RPol)
         partiali2__[i], delta2__[i], s2_[i] =
-        ShiftEvaluationPre((k_[i+1])*alpha, beta, ddi2__[i],
+        ShiftEvaluationPre(talpha, beta, ddi2__[i],
                            k_[i+1], RPol)
     end
 
@@ -454,14 +497,13 @@ function MatrixAPEvaluation(M, k_, logk,
     RPol = base_ring(M)
     x = gen(RPol)
     n = nrows(M)
-    RMat = MatrixSpace(R,n,n)
     alpha = R(alpha)
     beta = R(beta)
 
     # STEP logk+1
-    res_ = [ Evaluate(M, alpha), Evaluate(M, alpha+beta) ]
-    old1_ = [ zero(RMat), zero(RMat) ]
-    old2_ = [ zero(RMat), zero(RMat) ]
+    res_ = dense_matrix_type(R)[ Evaluate(M, alpha), Evaluate(M, alpha+beta) ]
+    old1_ = dense_matrix_type(R)[ zero_matrix(R, n, n), zero_matrix(R, n, n) ]
+    old2_ = dense_matrix_type(R)[ zero_matrix(R, n, n), zero_matrix(R, n, n) ]
 
     # STEPS logk:2
     for i = logk:-1:1
@@ -475,13 +517,13 @@ function MatrixAPEvaluation(M, k_, logk,
         # at the end of the step i
         # 	res_[l] = M_k_[i]((l-1)*beta), l = 1,...,k_[i]+1
         #
-        old1_ = vcat(old1_, [ zero(RMat) for l in (length(old1_)+1):(2*(k_[i+1]+1)) ])
+        old1_ = append!(old1_, (zero_matrix(R, n, n) for l in (length(old1_)+1):(2*(k_[i+1]+1))))
         # make space for new matrices
-        old2_ = vcat(old2_, [ zero(RMat) for l in (length(old2_)+1):(2*(k_[i+1]+1)) ])
+        old2_ = append!(old2_, ( zero_matrix(R, n, n) for l in (length(old2_)+1):(2*(k_[i+1]+1)) ))
 
         if (ModByPowerOf2(k_[i],1) == 1)
             # "correction" term in case of odd k_[i]
-            correction_ = [ Evaluate(M, l*beta + alpha*k_[i]) for
+            correction_ = dense_matrix_type(R)[ Evaluate(M, l*beta + alpha*k_[i]) for
                            l in 0:(k_[i]) ]
         end
         d = k_[i+1]
@@ -490,7 +532,7 @@ function MatrixAPEvaluation(M, k_, logk,
             # to deduce the components of M_k_[i]
             for c = 1:n
                 # we need more values of each component of M_k_[i+1]
-                baseValues_ = [ res_[j][r,c] for j in 1:(k_[i+1]+1) ]
+                baseValues_ = elem_type(R)[ res_[j][r,c] for j in 1:(k_[i+1]+1) ]
                 values1_ = vcat(baseValues_,
                                 ShiftEvaluation(partiali1__[i], delta1__[i],
                                                 s1_[i], ddi1__[i], d, baseValues_, RPol))
@@ -508,9 +550,9 @@ function MatrixAPEvaluation(M, k_, logk,
         end
         # using the evaluated matrices, compute the new res_
         if (ModByPowerOf2(k_[i],1) == 0)
-            res_ = [ old1_[l]*old2_[l] for l in 1:(k_[i]+1) ]
+            res_ = dense_matrix_type(R)[ old1_[l]*old2_[l] for l in 1:(k_[i]+1) ]
         else
-            res_ = [ old1_[l]*old2_[l]*correction_[l] for
+            res_ = dense_matrix_type(R)[ old1_[l]*old2_[l]*correction_[l] for
                     l in 1:(k_[i]+1) ]
         end
     end
@@ -520,7 +562,7 @@ end
 
 function ToBase(M)
     Mb = matrix(base_ring(base_ring(M)),
-               [ coeff(M[i, j], 0) for i = 1:nrows(M),j = 1:ncols(M)])
+                elem_type(base_ring(base_ring(M)))[ coeff(M[i, j], 0) for i = 1:nrows(M),j = 1:ncols(M)])
     return Mb
 end
 
@@ -541,17 +583,16 @@ function MatrixEvaluationPre(M, k, ki_)
     # 1: Proposition 9 of BGS07, Evaluate Mk at 0, 1, ..., k2-1
     R = base_ring(base_ring(M))
     n = nrows(M)
-    RMat = MatrixSpace(R,n,n)
-    M_ = [ Evaluate(M,R(i)) for i in 1:(k+k2-1) ]
-    L_ = [zero(RMat) for i in 1:k2]
+    M_ = dense_matrix_type(R)[ Evaluate(M,R(i)) for i in 1:(k+k2-1) ]
+    L_ = Vector{dense_matrix_type(R)}(undef, k2)
     for i = k2:-1:(k+1)
-        L_[i] = one(RMat)
+        L_[i] = identity_matrix(R, n)
     end
     for i = k:-1:1
         L_[i] = M_[i]*L_[i+1]
     end		# L_ is ok, collects M(1),...,M(k)
-    C_ = [zero(RMat) for i in 1:k2]
-    C_[1] = one(RMat)
+    C_ = Vector{dense_matrix_type(R)}(undef, k2)
+    C_[1] = identity_matrix(R, n)
     for i = 2:(k+1)
         C_[i] = C_[i-1]*M_[k+i-1]
     end
@@ -562,23 +603,31 @@ function MatrixEvaluationPre(M, k, ki_)
     for i = (k2-1):-1:(k+2)
         C_[i] = M_[i]*C_[i+1]
     end		# C_ is ok, collects M(k+1),...,M(2*k)
-    R_ = [ one(RMat) for i in 1:k2 ]
+    R_ = Vector{dense_matrix_type(R)}(undef, k2)
+    for i in 1:k+1
+      R_[i] = identity_matrix(R, n)
+    end
     for i = (k+2):k2
         R_[i] = R_[i-1]*M_[k+i-1]
     end		# R_ is ok, collects M(2*k+1),...,M(2*k+(k2-k))
 
-    MkEval_ = [ L_[i]*C_[i]*R_[i] for i in 1:k2 ]
+    MkEval_ = Vector{dense_matrix_type(R)}(undef, k2)
+    for i in 1:k2
+      MkEval_[i] = L_[i]*C_[i]
+      MkEval_[i] = mul!(MkEval_[i], MkEval_[i], R_[i])
+    end
     # at  this point, MkEval_[i] contains M_k(i-1), 1 \le i \le k2
 
     # 2: Interpolate:compute M_k(X) a la Algorithm 10.11
     # zur Gathen/Gerhard
     # i. this replaces the use of algorithm 10_5
-    facki_ = [one(R) for i in 1:(k2 - 1)] # facki_[i] contains 1/fac(i)
+    facki_ = Vector{elem_type(R)}(undef, k2 - 1) # facki_[i] contains 1/fac(i)
+    facki_[1] = one(R)
     for i = 2:k2-1
         facki_[i] = facki_[i-1]*ki_[i]
     end
     sign = -1
-    s_ = [zero(R) for i in 1:k2]
+    s_ = Vector{elem_type(R)}(undef, k2)
     s_[1] = sign*facki_[k2-1]
     for i = 2:k2-1
         sign = -sign
@@ -587,19 +636,19 @@ function MatrixEvaluationPre(M, k, ki_)
     s_[k2] = facki_[k2-1]
 
     # ii. call algorithm 10_3
-    points_ = [ R(i) for i in 0:(k2-1) ]
+    points_ = elem_type(R)[ R(i) for i in 0:(k2-1) ]
     RPol = base_ring(M)
     x = gen(RPol)
     logk2 = floor(Int,log2(k2))
-    Mij_ = Algorithm10_3([ x-points_[i] for i in 1:k2 ], logk2)
+    Mij_ = Algorithm10_3(elem_type(RPol)[ x-points_[i] for i in 1:k2 ], logk2)
 
     # iii. call algorithm 10_9
-    points_ = [ R(i) for i in 0:(k2-1) ]
+    points_ = elem_type(R)[ R(i) for i in 0:(k2-1) ]
     Mk = zero(parent(M))
     for r = 1:n
         for c = 1:n
             Mk[r,c] = Algorithm10_9(points_,
-                                    [ s_[i]*MkEval_[i][r,c] for i in 1:k2 ], Mij_)
+                                    elem_type(R)[ s_[i]*MkEval_[i][r,c] for i in 1:k2 ], Mij_, RPol)
         end
     end
 
@@ -627,14 +676,13 @@ function MatrixEvaluation(Mk, k2, beta_)
     n = nrows(Mk)
     RPol = base_ring(Mk)
     x = gen(RPol)
-    RMat = MatrixSpace(R,n,n)
     logk2 = floor(Int,log2(k2))
 
     # 3: Evaluate M_k(X) at the points specified by beta_
-    res_ = [ zero(RMat) for i in 1:length(beta_) ]
+    res_ = dense_matrix_type(R)[zero_matrix(R, n, n) for i in 1:length(beta_)]
     p = 1
     while (p+k2-1 <= length(beta_))
-        moduli_ = [ x-beta_[i] for i in p:(p+k2-1) ]
+        moduli_ = elem_type(RPol)[ x-beta_[i] for i in p:(p+k2-1) ]
         Mij_ = Algorithm10_3(moduli_, logk2)
         for r = 1:n
             for c = 1:n
@@ -651,8 +699,9 @@ function MatrixEvaluation(Mk, k2, beta_)
         for i = (b+1):(p+k2-1)
             push!(beta_, 0)
         end
-        moduli_ = [ x-beta_[i] for i in p:(p+k2-1) ]
+        moduli_ = elem_type(RPol)[ x-beta_[i] for i in p:(p+k2-1) ]
         Mij_ = Algorithm10_3(moduli_, logk2)
+
         for r = 1:n
             for c = 1:n
                 values_ = Algorithm10_5(Mk[r,c], moduli_, Mij_)
@@ -681,7 +730,7 @@ function UpperCaseDD(alpha, beta, k)
     #
     #    Returns the element D(alpha, beta, k) of R
 
-    k_ = [ k ]
+    k_ = Int[ k ]
     while k_[end] > 1
         push!(k_, floor(k_[end]/2))
     end
@@ -701,7 +750,6 @@ function LinearRecurrence(M, L_, R_)
 end
 
 function LinearRecurrence(M, L_,R_, DDi, s)
-
     #    Implements [2, Theorem 10]
     #
     #    INPUT:
@@ -748,23 +796,22 @@ function LinearRecurrence(M, L_,R_, DDi, s)
 
         # the entries d+1:3d+1 are 2^s,2*2^s, ...,(2^s+1)*2^s
         ki_ = RetrieveInverses(DDi_[1], factorsdd_)
-        ki_ = [ factorsdd_[1]*ki_[i] for i in (d+1):(length(factorsdd_)-1)]
+        ki_ = elem_type(R)[ factorsdd_[1]*ki_[i] for i in (d+1):(length(factorsdd_)-1)]
         # ki_ = inverses of 1,2,...,k=2^s (in that order)
     else
         # ugly hack, in case k=1 we could do things much simpler
-        ki_ = [ 1 ]
+        ki_ = elem_type(R)[ R(1) ]
     end
 
     n = nrows(M)
-    RMat = MatrixSpace(R,n,n)
     # res_[i] will contain M(L_i,R_i) at the end
-    res_ = [ one(RMat) for j in 1:r0 ] # TODO this should probably be in Rmat????
+    res_ = dense_matrix_type(R)[ identity_matrix(R, n) for j in 1:r0 ] # TODO this should probably be in Rmat????
 
     # STEP 0
     # get interval indices
     # l_[j] stores "index" of first interval
     # that fits into [L_[j]+1,...,R_[j]]
-    l_ = [0 for j in 1:r0]
+    l_ = Int[0 for j in 1:r0]
     for j = 1:r0
         qu,re = divrem(L_[j], k)
         if (re > 0)
@@ -774,7 +821,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         end
     end
     # r_[j] stores "index" of last such interval
-    r_ = [ div(R_[j],k) for j in 1:r0 ]
+    r_ = Int[ div(R_[j],k) for j in 1:r0 ]
 
     # evaluate
     k_, logk, ddi1__, partiali1__, delta1__, s1_,
@@ -803,14 +850,14 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     # collect/glue
     for j = 1:r0
         for m = l_[j]:r_[j]
-            res_[j] = res_[j]*M_[m]
+            res_[j] = mul!(res_[j], res_[j], M_[m])
         end
     end
     # the interval [LApprox_[j]+1,...,RApprox_[j]]
-    LApprox_ = [ (l_[j]-1)*k for j in 1:r0 ]
+    LApprox_ = Int[ (l_[j]-1)*k for j in 1:r0 ]
     # is the current approximation (and subinterval) of
     # [L_[j]+1,...,R_[j]]
-    RApprox_ = [ r_[j]*k for j in 1:r0 ]
+    RApprox_ = Int[ r_[j]*k for j in 1:r0 ]
     # the matrix res_[j] stores
     # the corresponding matrix M(LApprox_[j],RApprox_[j])
     #  RApprox_ (and LApprox_) replaces N_j^{()}
@@ -849,7 +896,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         rho = div(kOld,k)
 
         # l_[j] = number 1,2,3,... of leftmost interval
-        l_ = [ div((LApprox_[j] - L_[j]),k) for j in 1:r0 ]
+        l_ = Int[ div((LApprox_[j] - L_[j]),k) for j in 1:r0 ]
         # (counting from the right and
         # starting from current approximation invertal)
         # of current interval length k that fits into\
@@ -858,7 +905,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         # if l_[j] (resp. r_[j]) is 0,
         # then LApprox_[j]-L_[j]<k (resp. R_[j]-RApprox_[j]<k)
         # and there is nothing:do in this iteration
-        r_ = [ div((R_[j] - RApprox_[j]), k) for j in 1:r0 ]
+        r_ = Int[ div((R_[j] - RApprox_[j]), k) for j in 1:r0 ]
 
         # prepare MatrixEvaluation
         MPre = MatrixEvaluationPre(M, k, ki_[1:k2-1])
@@ -866,10 +913,10 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         # are all defined because of (*)
 
         # evaluate left
-        evalPoints_ = [  ]
+        evalPoints_ = Int[  ]
         for j = 1:r0
-            evalPoints_ = vcat(evalPoints_, [ LApprox_[j] - m*k for
-                                             m in 1:rho ])
+            evalPoints_ = append!(evalPoints_, Int[ LApprox_[j] - m*k for
+                                                   m in 1:rho ])
         end
         M_ = MatrixEvaluation(MPre, k2, evalPoints_)
         # collect/glue left
@@ -880,9 +927,9 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         end
 
         # evaluate right
-        evalPoints_ = [ ]
+        evalPoints_ = Int[ ]
         for j = 1:r0
-            evalPoints_ = vcat(evalPoints_, [ RApprox_[j] + m*k for
+            evalPoints_ = append!(evalPoints_, Int[ RApprox_[j] + m*k for
                                              m in 0:(rho-1) ])
         end
         M_ = MatrixEvaluation(MPre, k2, evalPoints_)
@@ -899,8 +946,8 @@ function LinearRecurrence(M, L_,R_, DDi, s)
             end
         end
 
-        LApprox_ = [ LApprox_[j] - l_[j]*k for j in 1:r0 ]
-        RApprox_ = [ RApprox_[j] + r_[j]*k for j in 1:r0 ]
+        LApprox_ = Int[ LApprox_[j] - l_[j]*k for j in 1:r0 ]
+        RApprox_ = Int[ RApprox_[j] + r_[j]*k for j in 1:r0 ]
     end
 
     # FINAL STEP (k \le 2r)
@@ -914,17 +961,17 @@ function LinearRecurrence(M, L_,R_, DDi, s)
             r2 = 2^(floor(Int,log2(r))+1)
             # same thing as before with k and k2
             MPre = MatrixEvaluationPre(M, r, ki_[1:r2-1])
-            M_ = MatrixEvaluation(MPre, r2, [ LApprox_[j]-r for j in 1:r0 ])
+            M_ = MatrixEvaluation(MPre, r2, Int[ LApprox_[j]-r for j in 1:r0 ])
             for j = 1:r0
                 if (LApprox_[j]-L_[j] >= r)
-                    res_[j] = M_[j]*res_[j]
+                    res_[j] = mul!(res_[j], M_[j], res_[j])
                     LApprox_[j] = LApprox_[j]-r
                 end
             end
             M_ = MatrixEvaluation(MPre, r2, RApprox_)
             for j = 1:r0
                 if (R_[j]-RApprox_[j] >= r)
-                    res_[j] = res_[j]*M_[j]
+                    res_[j] = mul!(res_[j], res_[j], M_[j])
                     RApprox_[j] = RApprox_[j]+r
                 end
             end
