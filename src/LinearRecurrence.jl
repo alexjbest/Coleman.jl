@@ -361,6 +361,10 @@ function Algorithm10_5(f, moduli_, Mij_)
     #
     n = length(moduli_)
     k = length(Mij_) -1
+    #new_rem_ = [ 0 * f for i in 1:n]
+    #new_rem2_ = [ 0 * f for i in 1:n]
+    #new_rem_[1] = deepcopy(f)
+
     rem_ = typeof(f)[ f ]
     while (k > 0)
         remOld_ = rem_
@@ -368,10 +372,70 @@ function Algorithm10_5(f, moduli_, Mij_)
         for i = 1:(n >> k)
             rem_[2*i - 1] = mod(remOld_[i], Mij_[k][2*i-1])
             rem_[2*i]     = mod(remOld_[i], Mij_[k][2*i])
+    #        mod!(new_rem2_[2*i - 1], new_rem_[i], Mij_[k][2*i-1])
+    #        mod!(new_rem2_[2*i],  new_rem_[i], Mij_[k][2*i])
+    #        @assert rem_[2 * i - 1] == new_rem2_[2 * i - 1]
+    #        @assert rem_[2 * i] == new_rem2_[2 * i]
         end
         k = k-1
+    #    new_rem_, new_rem2_ = new_rem2_, new_rem_
     end
+    #if isodd(k)
+    #  new_rem_, new_rem2_ = new_rem2_, new_rem_
+    #end
+    #@assert new_rem_ == rem_
+
     res_ = elem_type(base_ring(parent(f)))[ coeff(rem_[i],0) for i in 1:length(rem_) ]
+    #res2_ = elem_type(base_ring(parent(f)))[ coeff(new_rem_[i],0) for i in 1:length(new_rem_) ]
+    #@assert res_ == res2_
+    return res_
+end
+
+function Algorithm10_5_cached(f, moduli_, Mij_, cache1, cache2)
+    #    Implements [3, Algorithm 10.5]
+    #
+    #    NOTE:
+    #    #moduli_ = 2^k
+    #    #Mij_ = k+1
+    #
+    n = length(moduli_)
+    k = length(Mij_) -1
+    #@assert n == length(cache1)
+    #@assert n == length(cache2)
+    #cache1[1] = deepcopy(f)
+    set!(cache1[1], f)
+
+    #rem_ = typeof(f)[ deepcopy(f) ]
+    while (k > 0)
+    #    remOld_ = rem_
+    #    rem_ = Vector{typeof(f)}(undef, 2*(n >> k))
+        for i = 1:(n >> k)
+    #        rem_[2*i - 1] = mod(remOld_[i], Mij_[k][2*i-1])
+    #        rem_[2*i]     = mod(remOld_[i], Mij_[k][2*i])
+            #cache2[2*i - 1] = mod(cache1[i], Mij_[k][2*i-1])
+    #        z = zero(parent(f))
+    #        mod!(z, cache1[i], Mij_[k][2* i - 1])
+    #        @assert z == mod(cache1[i], Mij_[k][2*i-1])
+            cache2[2 * i] =mod!(cache2[2*i], cache1[i], Mij_[k][2*i])
+            #z = zero(parent(f))
+            #mod!(z, cache1[i], Mij_[k][2* i])
+            #@assert z == mod(cache1[i], Mij_[k][2*i])
+            cache2[2* i - 1] = mod!(cache2[2*i - 1], cache1[i], Mij_[k][2*i-1])
+            #@assert cache2[2 * i - 1] == mod(cache1[i], Mij_[k][2*i-1])
+            #@assert cache2[2 * i] == mod(cache1[i], Mij_[k][2*i])
+            #@assert rem_[2 * i - 1] == cache2[2 * i - 1]
+            #@assert rem_[2 * i] == cache2[2 * i]
+        end
+        k = k-1
+        cache1, cache2 = cache2, cache1
+    end
+    if isodd(k)
+      cache1, cache2 = cache2, cache1
+    end
+
+    #@assert cache1 == rem_
+
+    res_ = elem_type(base_ring(parent(f)))[ coeff(cache1[i],0) for i in 1:length(cache1) ]
     return res_
 end
 
@@ -681,14 +745,23 @@ function MatrixEvaluation(Mk, k2, beta_)
     # 3: Evaluate M_k(X) at the points specified by beta_
     res_ = dense_matrix_type(R)[zero_matrix(R, n, n) for i in 1:length(beta_)]
     p = 1
+    cache = Dict{Int, Tuple{Vector{elem_type(RPol)}, Vector{elem_type(RPol)}}}()
     while (p+k2-1 <= length(beta_))
         moduli_ = elem_type(RPol)[ x-beta_[i] for i in p:(p+k2-1) ]
         Mij_ = Algorithm10_3(moduli_, logk2)
+        if haskey(cache, length(moduli_))
+          cache1, cache2 = cache[length(moduli_)]
+        else
+          cache1 = elem_type(RPol)[ zero(RPol) for i in 1:length(moduli_) ]
+          cache2 = elem_type(RPol)[ zero(RPol) for i in 1:length(moduli_) ]
+          cache[length(moduli_)] = (cache1, cache2)
+        end
         for r = 1:n
             for c = 1:n
-                values_ = Algorithm10_5(Mk[r,c], moduli_, Mij_)
+                values_ = Algorithm10_5_cached(Mk[r,c], moduli_, Mij_, cache1, cache2)
+                #@assert values_ == Algorithm10_5(Mk[r,c], moduli_, Mij_)
                 for i = 1:k2
-                    res_[p+i-1][r,c] = values_[i]
+                  res_[p+i-1][r,c] = deepcopy(values_[i])
                 end
             end
         end
@@ -702,11 +775,20 @@ function MatrixEvaluation(Mk, k2, beta_)
         moduli_ = elem_type(RPol)[ x-beta_[i] for i in p:(p+k2-1) ]
         Mij_ = Algorithm10_3(moduli_, logk2)
 
+        if haskey(cache, length(moduli_))
+          cache1, cache2 = cache[length(moduli_)]
+        else
+          cache1 = elem_type(RPol)[ zero(RPol) for i in 1:length(moduli_) ]
+          cache2 = elem_type(RPol)[ zero(RPol) for i in 1:length(moduli_) ]
+          cache[length(moduli_)] = (cache1, cache2)
+        end
+
         for r = 1:n
             for c = 1:n
-                values_ = Algorithm10_5(Mk[r,c], moduli_, Mij_)
+                values_ = Algorithm10_5_cached(Mk[r,c], moduli_, Mij_, cache1, cache2)
+                #@assert values_ == Algorithm10_5(Mk[r,c], moduli_, Mij_)
                 for i = 1:b-p+1
-                    res_[p+i-1][r,c] = values_[i]
+                  res_[p+i-1][r,c] = deepcopy(values_[i])
                 end
             end
         end
@@ -988,3 +1070,54 @@ function LinearRecurrence(M, L_,R_, DDi, s)
 
     return res_
 end
+
+function mod!(f, h, g)
+   if length(g) == 0
+      throw(DivideError())
+   end
+
+   set!(f, h)
+
+   if length(h) >= length(g)
+      b = lead(g)
+      if !isone(b)
+        g = inv(b)*g
+      end
+      c = base_ring(f)()
+      while length(f) >= length(g)
+         l = -lead(f)
+         for i = 1:length(g) - 1
+            c = mul!(c, coeff(g, i - 1), l)
+            u = coeff(f, i + length(f) - length(g) - 1)
+            u = addeq!(u, c)
+            f = setcoeff!(f, i + length(f) - length(g) - 1, u)
+         end
+         set_length!(f, normalise(f, length(f) - 1))
+      end
+   end
+   return f
+end
+
+function set!(a::PolyElem{T}, b::PolyElem{T}) where {T}
+   fit!(a, length(b))
+   for i = 1:length(b)
+       a.coeffs[i] = set!(a.coeffs[i], b.coeffs[i])
+   end
+   set_length!(a, length(b))
+   return a
+end
+
+function set!(z::padic, a::padic)
+  ccall((:padic_set, :libflint), Nothing,
+        (Ref{padic}, Ref{padic}, Ref{FlintPadicField}), z, a, parent(a))
+  z.N = a.N
+  return z
+end
+
+function set!(z::qadic, a::qadic)
+   ccall((:qadic_set, :libflint), Nothing,
+         (Ref{qadic}, Ref{qadic}, Ref{FlintQadicField}), z, a, parent(a))
+   z.N = a.N
+   return z
+end
+
