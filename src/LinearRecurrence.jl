@@ -132,7 +132,7 @@ function LowerCaseDD(alpha,beta,d)
     return res
 end
 
-function add!(z::fmpq_abs_series, a::fmpq_abs_series, b::fmpq_abs_series)
+function Nemo.add!(z::fmpq_abs_series, a::fmpq_abs_series, b::fmpq_abs_series)
    lena = length(a)
    lenb = length(b)
 
