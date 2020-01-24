@@ -509,6 +509,10 @@ function VRedMatrixSeq(j, a, h, r_, s_, p, N, R1MatV, R1PolMatV, pts)
     return resM_, resD_
 end
 
+_lift_to(::Type{padic}) = fmpq
+
+_lift_to(::Type{qadic}) = fmpz_poly
+
 function VReduce(i, j, a, h, wH_, M_, D_, R1ModV)
     # "vertically" reduces the already
     # "horziontally reduced" differential
@@ -522,11 +526,21 @@ function VReduce(i, j, a, h, wH_, M_, D_, R1ModV)
     res = R1ModV([ wH_[N][j][i+1][1,m] for m in 2:R1ModV.ncols+1 ])
     #@info res
 
-    for k = (N-1):-1:1
-        res *= M_[k+1]
+    tmp = _lift_to(elem_type(R1))()
+
+    for k in (N-1):-1:1
+        res = mul!(res, res, M_[k+1])
         d = D_[k+1]
         ##@info d
-        res = R1ModV([ R1(lift_elem(divexact(res[1,m], d))) for m in 1:R1ModV.ncols ])
+        
+        t = Vector{elem_type(R1)}(undef, R1ModV.ncols)
+        #@show @which lift_elem(divexact(res[1, m], d))
+        for m in 1:R1ModV.ncols
+          z = lift_elem!(tmp, divexact(res[1, m], d))
+          t[m] = R1(z)
+        end
+        #res = R1ModV([ R1(lift_elem(divexact(res[1,m], d))) for m in 1:R1ModV.ncols ])
+        res = R1ModV(t)
         ##@info res
         # Add new term
         res = R1ModV([ wH_[k][j][i+1][1,m] + res[1,m-1] for m in 2:R1ModV.ncols+1 ])
