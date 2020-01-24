@@ -262,8 +262,28 @@ function RetrieveInverses(prodInv,r_)
     return inv_
 end
 
+function better_evaluate(a::PolyElem{T}, b::T) where {T}
+  i = length(a)
+  R = parent(b)
+  if i == 0
+    return zero(R)
+  end
+  z = one(R)
+  z = mul!(z, z, coeff(a, i - 1))
+  while i > 1
+    i -= 1
+    z = mul!(z, z, b)
+    add!(z, z, coeff(a, i - 1))
+  end
+  return z
+end
+
+function better_evaluate(a, b)
+  return evaluate(a, b)
+end
+
 function Evaluate(M, x)
-    return map(t->evaluate(t, x), M)
+    return map(t->better_evaluate(t, x), M)
 end
 
 function ShiftEvaluationPre(alpha, beta, ddi_, d, RPol)
@@ -344,11 +364,31 @@ function ShiftEvaluation(partiali_, delta_, s, ddi_, d,
     #
     R = base_ring(RPol)
     p = RPol(elem_type(R)[ baseValues_[i]*partiali_[i] for i in 1:(d+1) ])
-    q = p*s   # this multiplication accounts for roughly
+    #q = p*s   # this multiplication accounts for roughly
     # 1/3 of all computation time spent in LinearRecurrence
-    res_ = elem_type(R)[ R(delta_[k+1]*coeff(q,d+k)) for k in 0:d ]
+    #res_ = elem_type(R)[ R(delta_[k+1]*coeff(q,d+k)) for k in 0:d ]
+    res_ = _coeffs_in_the_middle(p, s, d)
+    for i in 1:(d + 1)
+      res_[i] = mul!(res_[i], res_[i], delta_[i])
+    end
 
     return res_
+end
+
+# Given f of degree d and g of degree 2*d, return
+# [ coeff(f * g, d + k) for k in 0:d ]
+# without computing f * g
+function _coeffs_in_the_middle(f, g, d)
+  R = base_ring(f)
+  t = R()
+  z = elem_type(R)[zero(R) for i in 0:d]
+  for k in d:(2*d)
+    for j in 0:k 
+      t = mul!(t, coeff(g, j), coeff(f, k - j))
+      z[k - d + 1] = add!(z[k - d + 1], z[k - d + 1], t)
+    end
+  end
+  return z
 end
 
 function Algorithm10_3(moduli_::Vector{T}, k) where {T}
@@ -639,23 +679,28 @@ function MatrixAPEvaluation(M, k_, logk,
         end
         d = k_[i+1]
 
+        baseValues_ = Vector{elem_type(R)}(undef, k_[i+1]+1)
+
         for r = 1:n
             # to deduce the components of M_k_[i]
             for c = 1:n
                 # we need more values of each component of M_k_[i+1]
-                baseValues_ = elem_type(R)[ res_[j][r,c] for j in 1:(k_[i+1]+1) ]
-                values1_ = vcat(baseValues_,
-                                ShiftEvaluation(partiali1__[i], delta1__[i],
-                                                s1_[i], ddi1__[i], d, baseValues_, RPol))
-                shiftedValues_ =
-                ShiftEvaluation(partiali2__[i], delta2__[i],
-                                s2_[i], ddi2__[i], d, baseValues_, RPol)
-                values2_ = vcat(shiftedValues_,
-                                ShiftEvaluation(partiali1__[i], delta1__[i],
-                                                s1_[i], ddi1__[i], d, shiftedValues_, RPol))
-                for l = 1:2*(k_[i+1]+1)
-                    old1_[l][r,c] = values1_[l]
-                    old2_[l][r,c] = values2_[l]
+                for j in 1:(k_[i+1]+1)
+                  baseValues_[j] = res_[j][r, c]
+                end
+                #baseValues_ = elem_type(R)[ res_[j][r,c] for j in 1:(k_[i+1]+1) ]
+                #@assert baseValues2_ == baseValues_
+                values1_ = ShiftEvaluation(partiali1__[i], delta1__[i], s1_[i], ddi1__[i], d, baseValues_, RPol)
+                shiftedValues_ = ShiftEvaluation(partiali2__[i], delta2__[i], s2_[i], ddi2__[i], d, baseValues_, RPol)
+                values2_ = ShiftEvaluation(partiali1__[i], delta1__[i], s1_[i], ddi1__[i], d, shiftedValues_, RPol)
+                for l in 1:length(baseValues_)
+                  old1_[l][r,c] = baseValues_[l]
+                  old2_[l][r,c] = shiftedValues_[l]
+                end
+                kk = length(baseValues_)
+                for l in (length(baseValues_)+ 1):2*(k_[i+1]+1)
+                  old1_[l][r,c] = values1_[l - kk]
+                  old2_[l][r,c] = values2_[l - kk]
                 end
             end
         end
@@ -976,15 +1021,18 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     M_ = MatrixAPEvaluation(M, k_, logk,
                             ddi1__, partiali1__, delta1__, s1_,
                             ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_)
-    M_ = vcat(M_[1:length(M_)-1],
+    pop!(M_)
+    append!(M_,
               MatrixAPEvaluation(Evaluate(M,x+k^2), k_, logk,
                                  ddi1__, partiali1__, delta1__, s1_,
                                  ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_))
-    M_ = vcat(M_[1:length(M_)-1],
+    pop!(M_)
+    append!(M_,
               MatrixAPEvaluation(Evaluate(M,x+2*k^2), k_, logk,
                                  ddi1__, partiali1__, delta1__, s1_,
                                  ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_))
-    M_ = vcat(M_[1:length(M_)-1],
+    pop!(M_)
+    append!(M_,
               MatrixAPEvaluation(Evaluate(M,x+3*k^2), k_, logk,
                                  ddi1__, partiali1__, delta1__, s1_,
                                  ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_))
@@ -1133,7 +1181,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     return res_
 end
 
-function mod!(f, h, g)
+function mod!(f::PolyElem{T}, h, g) where {T}
    if length(g) == 0
       throw(DivideError())
    end
@@ -1180,6 +1228,15 @@ function set!(z::qadic, a::qadic)
    ccall((:qadic_set, :libflint), Nothing,
          (Ref{qadic}, Ref{qadic}, Ref{FlintQadicField}), z, a, parent(a))
    z.N = a.N
+   return z
+end
+
+function set!(z::fmpq_abs_series, a::fmpq_abs_series)
+   ccall((:fmpq_poly_init, :libflint), Nothing, (Ref{fmpq_abs_series},), z)
+   ccall((:fmpq_poly_set, :libflint), Nothing,
+        (Ref{fmpq_abs_series}, Ref{fmpq_abs_series}), z, a)
+   z.prec = a.prec
+   z.parent = parent(a)
    return z
 end
 

@@ -77,7 +77,7 @@ for K in [GF(257), GF(521), GF(1031), GF(2053), GF(4099), GF(8209), GF(211^2), G
         ZetaFunction(a, h);
         t1 := Cputime(T);
         T := Cputime();
-        ZetaFunction(a, h);
+        time ZetaFunction(a, h);
         t2 := Cputime(T);
         Append(~res, <h, a, (t0 + t1 + t2)/3, Max([t0, t1, t2]), Min([t0, t1, t2])>);
 
@@ -92,7 +92,6 @@ end for;
 /*
 a:= 3;
 
->>>>>>> 2485eb72d34804304d2cc712d4961639201f19de
 R<x>:= PolynomialRing(GF(257));
 h:= x^8 + x^7 + 1321*x^5 + 12321*x + 1765765;
 time ZetaFunction(a, h);
