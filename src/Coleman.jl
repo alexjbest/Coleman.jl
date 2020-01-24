@@ -423,7 +423,8 @@ function HReduce(i, b, iota, mu_, genM, genD, M_, D_, p, R1ModH)
 
     for l = (i+ length(mu_)):-1:1
         for m = 1:b-1
-            res *= Evaluate(genM, R1(p*l-m))*inv(evaluate(genD, R1(p*l-m)))
+            res = mul!(res, res, Evaluate(genM, R1(p*l-m)))
+            res *= inv(evaluate(genD, R1(p*l-m)))
         end
         ##@info "res",res;
         res *= Evaluate(genM, R1(p*l-b))
@@ -434,7 +435,7 @@ function HReduce(i, b, iota, mu_, genM, genD, M_, D_, p, R1ModH)
         ##@info "res",res;
         res *= M_[l]
         res *= inv(D_[l])
-        res *= Evaluate(genM, R1((l-1)*p))
+        res = mul!(res, res, Evaluate(genM, R1((l-1)*p)))
         res *= inv(evaluate(genD,R1((l-1)*p)))
         if ((l-1)-i-1 >= 0)
             res[1,1] += mu_[(l-1)-i]
@@ -1141,12 +1142,12 @@ end
 
 # Return local coordinates on the curve y^a = h(x) around P = (X,Y) up to t-adic precision N.
 function LocalCoords(a, h, N, p, P, pts = [])
-    if is_in_weierstrass_disk(a, h, P)
-        return LocalCoordsW(a, h, N, p, P, pts)
+    if is_in_branch_disk(a, h, P)
+        return LocalCoordsB(a, h, N, p, P, pts)
     elseif is_in_inf_disk(a, h, P)
         return LocalCoordsInf(a, h, N, p, P, pts)
     else
-        return LocalCoordsNonW(a, h, N, p, P, pts)
+        return LocalCoordsNonB(a, h, N, p, P, pts)
     end
 end
 
@@ -1247,8 +1248,8 @@ function LocalCoordsInf(a, h, N, p, P, pts = [])
     return (xt,yt,t0)
 end
 
-# Non-weierstrass
-function LocalCoordsNonW(a, h, N, p, P, pts = [])
+# Non-branch
+function LocalCoordsNonB(a, h, N, p, P, pts = [])
     @assert valuation(discriminant(h)) == 0
     K = base_ring(h)
     @assert K.prec_max >= N
@@ -1270,8 +1271,8 @@ function LocalCoordsNonW(a, h, N, p, P, pts = [])
     return (xt,yt, K(0))
 end
 
-# Weierstrass
-function LocalCoordsW(a, h, N, p, P, pts = [])
+# Branch
+function LocalCoordsB(a, h, N, p, P, pts = [])
     K = base_ring(h)
     @assert !pos_val(K, discriminant(h))
     @assert K.prec_max >= N
@@ -1298,7 +1299,7 @@ function pos_val(K, x)
     return valuation(K(x)) > 0
 end
 
-function is_in_weierstrass_disk(a, h, P)
+function is_in_branch_disk(a, h, P)
     K = base_ring(h)
     return pos_val(K, P[2])
 end
@@ -1366,7 +1367,7 @@ function lift_x(a, h, X, y = nothing)
     if y == nothing
         y = K(lift_elem(root(R(lift_elem(h(X))), a)))
     end
-    if is_in_weierstrass_disk(a,h,(X,y))
+    if is_in_branch_disk(a,h,(X,y))
         error("not implemented")
     else
         # TODO: in fact this is the same newton iteration as above, can we simplify?
@@ -1387,7 +1388,7 @@ function lift_y(a, h, Y, x = nothing)
         #x = K(lift_elem(root(GF(Int(prime(K)))(lift_elem(h(X))), a)))
         error("not implemented")
     end
-    if !is_in_weierstrass_disk(a,h,(x,Y))
+    if !is_in_branch_disk(a,h,(x,Y))
         error("not implemented")
     else
         # TODO: in fact this is the same newton iteration as above, can we simplify?
@@ -1453,7 +1454,7 @@ end
 
 
 # Indices of the list from BasisMonomials which are regular 1-forms
-# See  Weierstrass Points on Cyclic Covers of the Projective Line - Christopher Towse : Proposition 2.
+# See  Branch Points on Cyclic Covers of the Projective Line - Christopher Towse : Proposition 2.
 function RegularIndices(a, h)
     BM = BasisMonomials(a, h)
     k = ceil(degree(h)//a)
@@ -1566,7 +1567,7 @@ function ColemanIntegrals(a, h, N, p, n, y::Symbol, x::Tuple; frobact = nothing)
 end
 
 # TODO compute the frobenius action only once
-function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
+function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, algorithm = :notdumb)
     if y != :inf
         # Decompose as two integrals, one x to infinity, one y to infinity
         A,B = ColemanIntegrals(a, h, N, p, n, x, :inf) , ColemanIntegrals(a, h, N, p, n, y, :inf)
@@ -1574,17 +1575,25 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing)
         # original integral is difference of the above
         return A - B
     else
-        if is_in_weierstrass_disk(a, h, x) # Weierstrass trick
-            l = Int(divexact(ZZ(p^n - 1),ZZ(a)))
-            K = Kmun(base_ring(h), l)
-            zeta = teichmuller(K(lift_elem(gen(FiniteField(prime(K), l, "w")[1]))))^l
-            ex = (p^l - 1)//(p^n - 1) # a gen of F_p^l to the ex power will gen F_p^n
-            hK = PolynomialRing(K, "x")[1]([lift_elem(coeff(h,i)) for i in 0:length(h)])
-            # TODO check this is always compatible, not always conway!! for large p
-            xK = (K(lift_elem(x[1])),K(lift_elem(x[2]))) # x base changed to K
-            muxK = superelliptic_automorphism(a, hK, p, degree(K), xK)
+        if is_in_branch_disk(a, h, x)
+            if algorithm != :notdumb # Branch trick
+                l = Int(divexact(ZZ(p^n - 1),ZZ(a)))
+                K = Kmun(base_ring(h), l)
+                zeta = teichmuller(K(lift_elem(gen(FiniteField(prime(K), l, "w")[1]))))^l
+                ex = (p^l - 1)//(p^n - 1) # a gen of F_p^l to the ex power will gen F_p^n
+                hK = PolynomialRing(K, "x")[1]([lift_elem(coeff(h,i)) for i in 0:length(h)])
+                # TODO check this is always compatible, not always conway!! for large p
+                xK = (K(lift_elem(x[1])),K(lift_elem(x[2]))) # x base changed to K
+                muxK = superelliptic_automorphism(a, hK, p, degree(K), xK)
 
-            return [get_padic(inv(zeta - 1)*b) for b in TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK)]
+                return [get_padic(inv(zeta - 1)*b) + O(base_ring(h), prime(base_ring(h))^N) for b in TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK)]
+            else
+                B = lift_y(a, h, base_ring(h)(0), x[1])
+                @info x
+                @info B
+
+                return -TinyColemanIntegralsOnBasis(a, h, N, p, n, B, x)
+            end
         else
             pts = [x]
             for i in 1:n-1
