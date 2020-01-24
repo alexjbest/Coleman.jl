@@ -77,6 +77,14 @@ function lift_elem(ei::Integer)
     return ei
 end
 
+function lift_elem!(r::fmpz_poly, a::qadic)
+  ctx = parent(a)
+  res = Bool(ccall((:padic_poly_get_fmpz_poly, :libflint), Cint,
+                   (Ref{fmpz_poly}, Ref{qadic}, Ref{FlintQadicField}), r, a, ctx))
+  !res && error("Unable to lift")
+  return r
+end
+
 function lift_elem(ei::Nemo.FinFieldElem)
     R = FmpzPolyRing(:x)
     x = gen(R)
@@ -88,7 +96,14 @@ function lift_elem(ei::Nemo.FinFieldElem)
 end
 
 function lift_elem(ei::Nemo.padic)
-    return lift(QQ, ei)
+    return lift(FlintQQ, ei)
+end
+
+function lift_elem!(r::fmpq, a::padic)
+  ctx = parent(a)
+  ccall((:padic_get_fmpq, :libflint), Nothing,
+        (Ref{fmpq}, Ref{padic}, Ref{FlintPadicField}), r, a, ctx)
+  return r
 end
 
 function lift_elem(ei::Nemo.fmpq)
@@ -341,15 +356,47 @@ function Algorithm10_3(moduli_::Vector{T}, k) where {T}
     #
     #    NOTE: #moduli_ = 2^k
     #
+    cache = Vector{T}[ T[ zero(parent(moduli_[1])) for i in 1:2^(j - 1) ] for j in (k + 1):-1:1]
     n = length(moduli_)
     res_ = Vector{T}[T[] for i in 1:k+1]
     res_[1] = T[ moduli_[j] for j in 1:n]
+    for j in 1:n
+      cache[1][j] = set!(cache[1][j], moduli_[j])
+    end
     for i = 2:k+1
         for j = 1:(n >> (i-1))
             push!(res_[i], res_[i-1][2*j-1]*res_[i-1][2*j])
+            cache[i][j] = mul!(cache[i][j], res_[i - 1][2 * j - 1], res_[i - 1][2 * j])
         end
     end
+    #@show length.(res_)
+    #@show length.(cache)
+    @assert cache == res_
     return res_
+end
+
+function Algorithm10_3_cached(moduli_::Vector{T}, k, cache) where {T}
+    #    Implements [3, Algorithm 10.3]
+    #
+    #    NOTE: #moduli_ = 2^k
+    #
+    n = length(moduli_)
+    #res_ = Vector{T}[T[] for i in 1:k+1]
+    #res_[1] = T[ moduli_[j] for j in 1:n]
+    for j in 1:n
+      cache[1][j] = set!(cache[1][j], moduli_[j])
+    end
+    for i = 2:k+1
+        for j = 1:(n >> (i-1))
+            #push!(res_[i], res_[i-1][2*j-1]*res_[i-1][2*j])
+            #cache[i][j] = mul!(cache[i][j], cache[i - 1][2 * j - 1], cache[i - 1][2 * j])
+            cache[i][j] = cache[i - 1][2 * j - 1] * cache[i - 1][2 * j]
+        end
+    end
+    #@show length.(res_)
+    #@show length.(cache)
+    #@assert cache == res_
+    return cache
 end
 
 function Algorithm10_5(f, moduli_, Mij_)
@@ -746,9 +793,16 @@ function MatrixEvaluation(Mk, k2, beta_)
     res_ = dense_matrix_type(R)[zero_matrix(R, n, n) for i in 1:length(beta_)]
     p = 1
     cache = Dict{Int, Tuple{Vector{elem_type(RPol)}, Vector{elem_type(RPol)}}}()
+    cache_10_3 = Dict{Int, Vector{Vector{elem_type(RPol)}}}()
     while (p+k2-1 <= length(beta_))
         moduli_ = elem_type(RPol)[ x-beta_[i] for i in p:(p+k2-1) ]
-        Mij_ = Algorithm10_3(moduli_, logk2)
+        if haskey(cache_10_3, logk2)
+          _cache = cache_10_3[logk2]
+        else
+          _cache = Vector{elem_type(RPol)}[ elem_type(RPol)[ zero(RPol) for i in 1:2^(j - 1) ] for j in (logk2 + 1):-1:1]
+          cache_10_3[logk2] = _cache
+        end
+        Mij_ = Algorithm10_3_cached(moduli_, logk2, _cache)
         if haskey(cache, length(moduli_))
           cache1, cache2 = cache[length(moduli_)]
         else
@@ -773,7 +827,15 @@ function MatrixEvaluation(Mk, k2, beta_)
             push!(beta_, 0)
         end
         moduli_ = elem_type(RPol)[ x-beta_[i] for i in p:(p+k2-1) ]
-        Mij_ = Algorithm10_3(moduli_, logk2)
+        
+        if haskey(cache_10_3, logk2)
+          _cache = cache_10_3[logk2]
+        else
+          _cache = Vector{elem_type(RPol)}[ elem_type(RPol)[ zero(RPol) for i in 1:2^(j - 1) ] for j in (logk2 + 1):-1:1]
+          cache_10_3[logk2] = _cache
+        end
+
+        Mij_ = Algorithm10_3_cached(moduli_, logk2, _cache)
 
         if haskey(cache, length(moduli_))
           cache1, cache2 = cache[length(moduli_)]
