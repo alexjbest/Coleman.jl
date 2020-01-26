@@ -1012,7 +1012,10 @@ end
 function superelliptic_automorphism(a, h, p, n, P)
     @assert mod(ZZ(p^n - 1),ZZ(a)) == 0
     K = base_ring(h)
-    zeta = prim_root(K)^Int(divexact(ZZ(p^n - 1),ZZ(a)))
+    R,X = PolynomialRing(K, "x")
+    D = Hecke.Hensel_factorization(divexact(X^a - 1, X - 1))
+    @info D
+    zeta = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
 
     return (P[1], zeta*P[2])
 end
@@ -1289,7 +1292,7 @@ end
 function LocalCoordsB(a, h, N, p, P, pts = [])
     K = base_ring(h)
     @assert !pos_val(K, discriminant(h))
-    @assert K.prec_max >= N
+    #@assert K.prec_max >= N
     # TODO change to Laurent series once we have derivative
     R,t = LaurentSeriesField(K, N, 't', cached=true)
     #R,t = PowerSeriesRing(K, N, 't', cached=true, model=:capped_absolute)
@@ -1581,6 +1584,7 @@ function ColemanIntegrals(a, h, N, p, n, y::Symbol, x::Tuple; frobact = nothing)
 end
 
 # TODO compute the frobenius action only once
+# \int_x^y omega
 function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, algorithm = :notdumb)
     if y != :inf
         # Decompose as two integrals, one x to infinity, one y to infinity
@@ -1590,23 +1594,32 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, 
         return A - B
     else
         if is_in_branch_disk(a, h, x)
-            if algorithm != :notdumb # Branch trick
+            # TODO check signs
+            if algorithm != :notdumb
                 l = Int(divexact(ZZ(p^n - 1),ZZ(a)))
-                K = Kmun(base_ring(h), l)
-                zeta = teichmuller(K(lift_elem(gen(FiniteField(prime(K), l, "w")[1]))))^l
-                ex = (p^l - 1)//(p^n - 1) # a gen of F_p^l to the ex power will gen F_p^n
-                hK = PolynomialRing(K, "x")[1]([lift_elem(coeff(h,i)) for i in 0:length(h)])
+                K = Kmun(base_ring(h), a)
+                R,X = PolynomialRing(K, "x")
+                D = Hecke.Hensel_factorization(divexact(X^a - 1, X - 1))
+                @info D
+                zeta = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
+                #zeta = prim_root(K)^(divexact(ZZ(p^degree(K) - 1),a))#teichmuller(K(lift_elem(gen(FiniteField(prime(K), l, "w")[1]))))^l
+                @assert zeta^a == 1
+                #ex = (p^l - 1)//(p^n - 1) # a gen of F_p^l to the ex power will gen F_p^n
+                hK = R([lift_elem(coeff(h,i)) for i in 0:length(h)])
                 # TODO check this is always compatible, not always conway!! for large p
                 xK = (K(lift_elem(x[1])),K(lift_elem(x[2]))) # x base changed to K
                 muxK = superelliptic_automorphism(a, hK, p, degree(K), xK)
+                @info xK
+                @info muxK
 
-                return [get_padic(inv(zeta - 1)*b) + O(base_ring(h), prime(base_ring(h))^N) for b in TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK)]
+                println("rt")
+                return [get_padic(inv(zeta^(-ij[2]) - 1)*b) + O(base_ring(h), prime(base_ring(h))^N) for (ij, b) in zip(BasisMonomials(a, h), TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK))]
             else
                 B = lift_y(a, h, base_ring(h)(0), x[1])
                 @info x
                 @info B
 
-                return -TinyColemanIntegralsOnBasis(a, h, N, p, n, B, x)
+                return TinyColemanIntegralsOnBasis(a, h, N, p, n, B, x)
             end
         else
             pts = [x]
