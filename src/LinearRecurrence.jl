@@ -974,10 +974,12 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     r = length(L_)	# r is allowed to change (e.g. in the final step)
     r0 = length(L_)	# r0 must never change
     k = 2^s	# current interval length
+    println(">> seeti")
     factorsDD_ = UpperCaseDD_(R(1),R(k),k)   # r_[1] = dd(alpha,beta,d)
     # with alpha = k*(d+1), beta=k, d=k/2
     # DDi_[1] = dd(alpha, beta, d)^(-1)
     DDi_ = RetrieveInverses(DDi,factorsDD_)
+    println(">> invs1")
     if (k > 1)
         d = k >> 1
         # the 1st entry is 2^s
@@ -991,6 +993,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         # ugly hack, in case k=1 we could do things much simpler
         ki_ = elem_type(R)[ R(1) ]
     end
+    println(">> asdas")
 
     n = nrows(M)
     # res_[i] will contain M(L_i,R_i) at the end
@@ -1016,11 +1019,13 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     k_, logk, ddi1__, partiali1__, delta1__, s1_,
     ddi2__, partiali2__, delta2__, s2_ =
     MatrixAPEvaluationPre(k, R(1), R(k), DDi_, RPol)
+    println(">> pre")
     # (the following currently accounts for 50% of all
     #  computation time in LinearRecurrences)
     M_ = MatrixAPEvaluation(M, k_, logk,
                             ddi1__, partiali1__, delta1__, s1_,
                             ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_)
+    println(">>eval")
     pop!(M_)
     append!(M_,
               MatrixAPEvaluation(Evaluate(M,x+k^2), k_, logk,
@@ -1038,6 +1043,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
                                  ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_))
     # M_[i] contains M((i-1)k,ik), i=1,...,4k,4k+1 i.e.
     # the matrix belonging:the i-th interval [(i-1)k+1,ik]
+    println(">> val")
 
     # collect/glue
     for j = 1:r0
@@ -1066,6 +1072,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
             RApprox_[j] = newValue
         end
     end
+    println(res_)
 
     while (k > 2*r0)
         # at the start of each loop we have
@@ -1141,6 +1148,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         LApprox_ = Int[ LApprox_[j] - l_[j]*k for j in 1:r0 ]
         RApprox_ = Int[ RApprox_[j] + r_[j]*k for j in 1:r0 ]
     end
+    println(res_)
 
     # FINAL STEP (k \le 2r)
     while (r >= 1)
@@ -1177,11 +1185,11 @@ function LinearRecurrence(M, L_,R_, DDi, s)
             r = 0
         end
     end
+    println(res_)
 
     return res_
 end
 
-#=
 function mod!(f::PolyElem{T}, h, g) where {T}
    if length(g) == 0
       throw(DivideError())
@@ -1208,7 +1216,6 @@ function mod!(f::PolyElem{T}, h, g) where {T}
    end
    return f
 end
-=#
 
 function set!(a::PolyElem{T}, b::PolyElem{T}) where {T}
    fit!(a, length(b))
