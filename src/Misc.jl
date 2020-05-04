@@ -38,7 +38,7 @@ end
 #    end
 #    return a
 #end
-Base.log(a::fmpz) = log(BigInt(a))
+#Base.log(a::fmpz) = log(BigInt(a))
 
 function (f::LaurentSeriesFieldElem)(x::LaurentSeriesFieldElem)
     @assert parent(f) == parent(x)

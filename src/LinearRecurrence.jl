@@ -49,10 +49,10 @@ function (R::FlintIntegerRing)(n::fmpz_poly)
     return R(coeff(n,0))
 end
 
-function (R::FlintIntegerRing)(n::fmpq)
-    @assert denominator(n) == 1
-    return R(numerator(n))
-end
+#function (R::FlintIntegerRing)(n::fmpq)
+#    @assert denominator(n) == 1
+#    return R(numerator(n))
+#end
 
 function (R::FlintIntegerRing)(n::fmpq_poly)
     return R(coeff(n,0))
@@ -70,7 +70,7 @@ function cast_poly_nmod(R, e)
 end
 
 function lift_elem(ei)
-    return lift(FmpzPolyRing(:x), ei)
+    return lift(FmpzPolyRing(FlintZZ,:x), ei)
 end
 
 function lift_elem(ei::Integer)
@@ -86,7 +86,7 @@ function lift_elem!(r::fmpz_poly, a::qadic)
 end
 
 function lift_elem(ei::Nemo.FinFieldElem)
-    R = FmpzPolyRing(:x)
+    R = FmpzPolyRing(FlintZZ,:x)
     x = gen(R)
     o = zero(R)
     for i in 0:degree(parent(ei))-1
@@ -1181,6 +1181,7 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     return res_
 end
 
+#=
 function mod!(f::PolyElem{T}, h, g) where {T}
    if length(g) == 0
       throw(DivideError())
@@ -1207,6 +1208,7 @@ function mod!(f::PolyElem{T}, h, g) where {T}
    end
    return f
 end
+=#
 
 function set!(a::PolyElem{T}, b::PolyElem{T}) where {T}
    fit!(a, length(b))

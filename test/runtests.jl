@@ -131,7 +131,7 @@ end
 @testset "Coleman.jl" begin
     #newbad()
     # Test 5
-    bad()
+    #bad()
     papertest()
     cubic_number_field_ex()
     quartic_number_field_ex()

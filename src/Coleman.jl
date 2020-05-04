@@ -67,9 +67,9 @@ function Nemo.degree(R::Nemo.NmodRing)
     return 1
 end
 
-function Nemo.degree(R::Nemo.FlintPadicField)
-    return 1
-end
+#function Nemo.degree(R::Nemo.FlintPadicField)
+#    return 1
+#end
 
 function (R::Nemo.FqFiniteField)(f::fmpz_poly)
     return f(gen(R))
@@ -560,7 +560,7 @@ function lift_fq_to_qadic(R, a)
     if typeof(a) <: Union{<: ResElem, Nemo.gfp_elem}
         return R(lift_elem(a))
     else
-        t = FmpzPolyRing(:x)([coeff(a, i) for i in 0:degree(R)-1])
+        t = FmpzPolyRing(FlintZZ,:x)([coeff(a, i) for i in 0:degree(R)-1])
         if degree(R) == 1
             return R(coeff(t,0))
         end
