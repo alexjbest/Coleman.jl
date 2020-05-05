@@ -79,7 +79,7 @@ end
 
 function lift_elem!(r::fmpz_poly, a::qadic)
   ctx = parent(a)
-  res = Bool(ccall((:padic_poly_get_fmpz_poly, :libflint), Cint,
+  res = Bool(ccall((:padic_poly_get_fmpz_poly, libflint), Cint,
                    (Ref{fmpz_poly}, Ref{qadic}, Ref{FlintQadicField}), r, a, ctx))
   !res && error("Unable to lift")
   return r
@@ -101,7 +101,7 @@ end
 
 function lift_elem!(r::fmpq, a::padic)
   ctx = parent(a)
-  ccall((:padic_get_fmpq, :libflint), Nothing,
+  ccall((:padic_get_fmpq, libflint), Nothing,
         (Ref{fmpq}, Ref{padic}, Ref{FlintPadicField}), r, a, ctx)
   return r
 end
@@ -157,7 +157,7 @@ function Nemo.add!(z::fmpq_abs_series, a::fmpq_abs_series, b::fmpq_abs_series)
    lenb = min(lenb, prec)
 
    lenz = max(lena, lenb)
-   ccall((:fmpq_poly_add_series, :libflint), Nothing,
+   ccall((:fmpq_poly_add_series, Coleman.libflint), Nothing,
                 (Ref{fmpq_abs_series}, Ref{fmpq_abs_series}, Ref{fmpq_abs_series}, Int),
                z, a, b, lenz)
    return z
@@ -396,22 +396,17 @@ function Algorithm10_3(moduli_::Vector{T}, k) where {T}
     #
     #    NOTE: #moduli_ = 2^k
     #
-    cache = Vector{T}[ T[ zero(parent(moduli_[1])) for i in 1:2^(j - 1) ] for j in (k + 1):-1:1]
     n = length(moduli_)
     res_ = Vector{T}[T[] for i in 1:k+1]
     res_[1] = T[ moduli_[j] for j in 1:n]
-    for j in 1:n
-      cache[1][j] = set!(cache[1][j], moduli_[j])
-    end
     for i = 2:k+1
         for j = 1:(n >> (i-1))
             push!(res_[i], res_[i-1][2*j-1]*res_[i-1][2*j])
-            cache[i][j] = mul!(cache[i][j], res_[i - 1][2 * j - 1], res_[i - 1][2 * j])
+            #cache[i][j] = mul!(cache[i][j], res_[i - 1][2 * j - 1], res_[i - 1][2 * j])
         end
     end
     #@show length.(res_)
     #@show length.(cache)
-    @assert cache == res_
     return res_
 end
 
@@ -974,12 +969,10 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     r = length(L_)	# r is allowed to change (e.g. in the final step)
     r0 = length(L_)	# r0 must never change
     k = 2^s	# current interval length
-    println(">> seeti")
     factorsDD_ = UpperCaseDD_(R(1),R(k),k)   # r_[1] = dd(alpha,beta,d)
     # with alpha = k*(d+1), beta=k, d=k/2
     # DDi_[1] = dd(alpha, beta, d)^(-1)
     DDi_ = RetrieveInverses(DDi,factorsDD_)
-    println(">> invs1")
     if (k > 1)
         d = k >> 1
         # the 1st entry is 2^s
@@ -993,7 +986,6 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         # ugly hack, in case k=1 we could do things much simpler
         ki_ = elem_type(R)[ R(1) ]
     end
-    println(">> asdas")
 
     n = nrows(M)
     # res_[i] will contain M(L_i,R_i) at the end
@@ -1019,13 +1011,11 @@ function LinearRecurrence(M, L_,R_, DDi, s)
     k_, logk, ddi1__, partiali1__, delta1__, s1_,
     ddi2__, partiali2__, delta2__, s2_ =
     MatrixAPEvaluationPre(k, R(1), R(k), DDi_, RPol)
-    println(">> pre")
     # (the following currently accounts for 50% of all
     #  computation time in LinearRecurrences)
     M_ = MatrixAPEvaluation(M, k_, logk,
                             ddi1__, partiali1__, delta1__, s1_,
                             ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_)
-    println(">>eval")
     pop!(M_)
     append!(M_,
               MatrixAPEvaluation(Evaluate(M,x+k^2), k_, logk,
@@ -1043,7 +1033,6 @@ function LinearRecurrence(M, L_,R_, DDi, s)
                                  ddi2__, partiali2__, delta2__, s2_, 1, k, DDi_))
     # M_[i] contains M((i-1)k,ik), i=1,...,4k,4k+1 i.e.
     # the matrix belonging:the i-th interval [(i-1)k+1,ik]
-    println(">> val")
 
     # collect/glue
     for j = 1:r0
@@ -1072,7 +1061,6 @@ function LinearRecurrence(M, L_,R_, DDi, s)
             RApprox_[j] = newValue
         end
     end
-    println(res_)
 
     while (k > 2*r0)
         # at the start of each loop we have
@@ -1148,7 +1136,6 @@ function LinearRecurrence(M, L_,R_, DDi, s)
         LApprox_ = Int[ LApprox_[j] - l_[j]*k for j in 1:r0 ]
         RApprox_ = Int[ RApprox_[j] + r_[j]*k for j in 1:r0 ]
     end
-    println(res_)
 
     # FINAL STEP (k \le 2r)
     while (r >= 1)
@@ -1185,7 +1172,6 @@ function LinearRecurrence(M, L_,R_, DDi, s)
             r = 0
         end
     end
-    println(res_)
 
     return res_
 end
@@ -1227,22 +1213,22 @@ function set!(a::PolyElem{T}, b::PolyElem{T}) where {T}
 end
 
 function set!(z::padic, a::padic)
-  ccall((:padic_set, :libflint), Nothing,
+  ccall((:padic_set, libflint), Nothing,
         (Ref{padic}, Ref{padic}, Ref{FlintPadicField}), z, a, parent(a))
   z.N = a.N
   return z
 end
 
 function set!(z::qadic, a::qadic)
-   ccall((:qadic_set, :libflint), Nothing,
+   ccall((:qadic_set, libflint), Nothing,
          (Ref{qadic}, Ref{qadic}, Ref{FlintQadicField}), z, a, parent(a))
    z.N = a.N
    return z
 end
 
 function set!(z::fmpq_abs_series, a::fmpq_abs_series)
-   ccall((:fmpq_poly_init, :libflint), Nothing, (Ref{fmpq_abs_series},), z)
-   ccall((:fmpq_poly_set, :libflint), Nothing,
+   ccall((:fmpq_poly_init, libflint), Nothing, (Ref{fmpq_abs_series},), z)
+   ccall((:fmpq_poly_set, libflint), Nothing,
         (Ref{fmpq_abs_series}, Ref{fmpq_abs_series}), z, a)
    z.prec = a.prec
    z.parent = parent(a)

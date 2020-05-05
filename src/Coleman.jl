@@ -38,7 +38,9 @@ include("Misc.jl")
 #import AbstractAlgebra.Ring
 #import AbstractAlgebra.PolyRing
 #import AbstractAlgebra.Generic.LaurentSeriesFieldElem
-using Nemo, Hecke
+using Hecke, Nemo, LoadFlint
+
+const libflint = LoadFlint.libflint
 
 
 export ColemanIntegrals, TinyColemanIntegralsOnBasis, ZetaFunction, AbsoluteFrobeniusActionOnLift, AbsoluteFrobeniusAction, TeichmullerPoint, lift_y, lift_x, verify_pt, verify_pts, count_points, rational_points, FrobeniusLift, padic_evaluate, BasisMonomials, RegularIndices, IsWeil
@@ -850,7 +852,7 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     # Step 3: Determine Frobenius action mod precision
     MM = deepcopy(M)
     for i in 1:n-1
-        # Apply Frobenius to MM TODO make this a nice function
+        # Apply Frobenius to MM
         map!(frobenius, MM, MM)
         # Multiply
         M = M * MM
@@ -1612,7 +1614,6 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, 
                 @info xK
                 @info muxK
 
-                println("rt")
                 return [get_padic(inv(zeta^(-ij[2]) - 1)*b) + O(base_ring(h), prime(base_ring(h))^N) for (ij, b) in zip(BasisMonomials(a, h), TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK))]
             else
                 B = lift_y(a, h, base_ring(h)(0), x[1])

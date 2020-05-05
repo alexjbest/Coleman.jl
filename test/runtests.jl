@@ -45,8 +45,6 @@ function test_linear_recurrences_modx()
                 [ xadic_to_padic(t[i, j],BrR) for i = 1:nrows(t),j = 1:ncols(t)])
          for t in O]
 
-
-
     o == Coleman.LinearRecurrence(MR, L, R)
     println("PASS")
 end
@@ -66,6 +64,7 @@ function papertest()
     h = x^4 + 7*x^3 + 3*x^2 - x
     print("coleman integrals on y^",A,"=",h,"...")
     P = Coleman.lift_point(A, h, K(1), 14*a+11) # the point (1,10^1/3)
+    @info P
     @test P[2]^3 == 10
     @test all([ColemanIntegrals(A, h, 3, 41, 2, P, :inf)[i] == 0 for i in RegularIndices(3, h)])
     println("PASS")
@@ -129,9 +128,8 @@ function newbad()
 end
 
 @testset "Coleman.jl" begin
-    #newbad()
     # Test 5
-    #bad()
+    bad()
     papertest()
     cubic_number_field_ex()
     quartic_number_field_ex()
@@ -167,5 +165,6 @@ end
     h = x^11 + 1765765
     test_zeta(a, h, 1)
 
+    newbad()
 
 end

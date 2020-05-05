@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
 Hecke = "3e1990a7-5d81-5526-99ce-9ba3ff248f21"
+LoadFlint = "472f376f-f1cf-461b-9ac1-d103423be9b7"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 
 [extras]
