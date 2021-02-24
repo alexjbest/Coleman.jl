@@ -53,8 +53,8 @@ end
 
 function Generic.integral(x::Generic.LaurentSeriesElem)
    z = deepcopy(x)
-   set_prec!(z, precision(x) + 1)
-   set_val!(z, valuation(x) + 1)
+   set_precision!(z, precision(x) + 1)
+   set_valuation!(z, valuation(x) + 1)
    len = pol_length(x)
    for i = 1:len
        z = setcoeff!(z, i - 1, polcoeff(x, i - 1)//((i-1)*Generic.scale(z)+valuation(z)))
@@ -67,8 +67,8 @@ end
 
 function Generic.derivative(x::Generic.LaurentSeriesElem)
    z = deepcopy(x)
-   set_prec!(z, precision(x) - 1)
-   set_val!(z, valuation(x) - 1)
+   set_precision!(z, precision(x) - 1)
+   set_valuation!(z, valuation(x) - 1)
    len = pol_length(x)
    for i = 1:len
        z = setcoeff!(z, i - 1, ((i-1)*Generic.scale(z)+valuation(z) + 1)*polcoeff(x, i - 1))
