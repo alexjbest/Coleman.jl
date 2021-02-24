@@ -936,16 +936,14 @@ function Nemo.root(r::Nemo.gfp_elem, a::Int)
     error("no root")
 end
 
-function Nemo.root(r::Nemo.fq, a::Int; not = nothing)
+function Nemo.root(r::Nemo.FinFieldElem, a::Int; not = nothing)
     K = parent(r)
     u = gen(K)
     p = characteristic(K)
     n = degree(K)
-    ui = [u^i for i in 0:(n-1)]
-    for xp in collect(Base.product([1:Int(p) for i in 0:(n-1)]...))
-        x = sum([xp[i] * ui[i] for i in 1:(n-1)])
-        if K(x)^a == r && (not != nothing || x != not)
-            return K(x)
+    for x in K
+        if x^a == r && (not == nothing || x != not)
+            return x
         end
     end
     error("no root")
