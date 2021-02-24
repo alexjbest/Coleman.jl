@@ -57,10 +57,6 @@ function Nemo.frobenius(a::Generic.Poly)
     return parent(a)([frobenius(coeff(a, i)) for i in 0:degree(a)])
 end
 
-function Nemo.degree(R::Nemo.GaloisField)
-    return 1
-end
-
 function Nemo.degree(R::ResRing{fmpz})
     return 1
 end
