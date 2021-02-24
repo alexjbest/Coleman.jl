@@ -1038,10 +1038,6 @@ function TeichmullerPoint(a::Int, h, p::Int, n::Int, P::Tuple{Any, Any})
     return new
 end
 
-function Nemo.derivative(f::Generic.Frac{<:PolyElem})
-    return (derivative(numerator(f))*denominator(f) - derivative(denominator(f))*numerator(f))//(denominator(f)^2)
-end
-
 function (f::Generic.Frac{<:PolyElem})(x::RingElem)
     return numerator(f)(x)//denominator(f)(x)
 end
