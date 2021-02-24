@@ -1042,28 +1042,6 @@ function (f::Generic.Frac{<:PolyElem})(x::RingElem)
     return numerator(f)(x)//denominator(f)(x)
 end
 
-
-function Generic.derivative(x::RelSeriesElem{T}) where {T <: RingElement}
-   xlen = pol_length(x)
-   xval = valuation(x)
-   xprec = precision(x)
-   z = parent(x)()
-   if 1 >= xlen + xval
-      set_prec!(z, max(0, xprec - 1))
-      set_val!(z, max(0, xprec - 1))
-   else
-      zlen = min(xlen + xval - 1, xlen)
-      fit!(z, zlen)
-      set_prec!(z, max(0, xprec - 1))
-      set_val!(z, max(0, xval - 1))
-      for i = 1:zlen
-          z = setcoeff!(z, i - 1, (i + xval + xlen - zlen - 1) * polcoeff(x, i + xlen  - zlen - 1))
-      end
-      renormalize!(z)
-   end
-   return z
-end
-
 function Generic.integral(x::RelSeriesElem{T}) where {T <: RingElement}
    xlen = pol_length(x)
    if xlen == 0
