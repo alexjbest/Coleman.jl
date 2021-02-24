@@ -10,6 +10,7 @@ jobs:
         julia-version: ["1.0", "1", nightly]
         julia-arch: [x64, x86]
         os: [ubuntu-latest, windows-latest, macOS-latest]
+        fail-fast: false
         exclude:
           - os: macOS-latest
             julia-arch: x86
