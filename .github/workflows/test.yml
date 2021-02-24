@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: [1.0, 1, nightly]
+        julia-version: ["1.0", "1", nightly]
         julia-arch: [x64, x86]
         os: [ubuntu-latest, windows-latest, macOS-latest]
         exclude:
@@ -19,5 +19,17 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.julia-version }}
-      - uses: julia-actions/julia-buildpkg@master
-      - uses: julia-actions/julia-runtest@master
+          arch: ${{ matrix.arch }}
+      - uses: actions/cache@v2
+        env:
+          cache-name: cache-artifacts
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-${{ matrix.arch }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-test-${{ env.cache-name }}-
+            ${{ runner.os }}-${{ matrix.arch }}-test-
+            ${{ runner.os }}-${{ matrix.arch }}-
+            ${{ runner.os }}-
+      - uses: julia-actions/julia-buildpkg@latest
+      - uses: julia-actions/julia-runtest@latest
