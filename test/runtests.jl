@@ -120,10 +120,10 @@ end
 
 function newbad()
     # Test 6
-    a = 3
-    K, s =Nemo.FiniteField(83,3,"s")
+    a = 2
+    K, s =Nemo.FiniteField(17,3,"s")
     R, x = PolynomialRing(K, "x")
-    h = s*x^4 +x*3+ 8
+    h = x^3 +s*x + 1
     test_zeta(a, h, 1)
 end
 
