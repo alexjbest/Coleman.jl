@@ -839,26 +839,28 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     bound = n*g/2 + 2*g*log(p,2)
     # N is the first integer strictly larger than bound
     N = floor(Int, bound+1)
-    #@info(N)
-    #@info N
+    @info N
 
     # Step 2: Determine absolute Frobenius action mod precision
     M = AbsoluteFrobeniusAction(a, hbar, N)
 
+    @info M
     # Step 3: Determine Frobenius action mod precision
     MM = deepcopy(M)
     for i in 1:n-1
         # Apply Frobenius to MM
         map!(frobenius, MM, MM)
         # Multiply
-        M = M * MM
+        M = MM * M
     end
+    @info M
 
     # Step 4: Determine L polynomial
     ZPol,t = PolynomialRing(FlintZZ,"t")
     #CP = charpoly(PolynomialRing(base_ring(M),"t")[1],M::MatElem{RingElem})
     #CP = invoke(charpoly, Tuple{Ring, Union{MatElem{Nemo.nmod},Generic.Mat}},  PolynomialRing(base_ring(M),"t")[1], M)
     CP = charpoly(PolynomialRing(base_ring(M),"t")[1], M)
+    @info CP
     Chi = cast_poly_nmod(ZPol, CP)
     L = numerator(t^(2*g)*(Chi)(1//t))
     coeff_ = [ coeff(L, i) for i in 0:(2*g) ]
