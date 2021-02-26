@@ -7,7 +7,9 @@
 [![Coveralls](https://coveralls.io/repos/github/alexjbest/Coleman.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/alexjbest/Coleman.jl?branch=master)
 
 
-This package computes Coleman integrals on superelliptic curves over the $p$-adic numbers, it is based on work of Moritz Minzlaff to compute the zeta functions of curves over finite fields.
+This package computes Coleman integrals on superelliptic curves over the $q$-adic numbers, it is based on work of Moritz Minzlaff to compute the zeta functions of curves over finite fields.
+
+Requires x64 it seems.
 
 ## Usage
 For usage examples see <test/runtests.jl>.
