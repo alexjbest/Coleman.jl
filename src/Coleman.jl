@@ -839,12 +839,12 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     bound = n*g/2 + 2*g*log(p,2)
     # N is the first integer strictly larger than bound
     N = floor(Int, bound+1)
-    @info N
+    #@info N
 
     # Step 2: Determine absolute Frobenius action mod precision
     M = AbsoluteFrobeniusAction(a, hbar, N)
 
-    @info M
+    #@info M
     # Step 3: Determine Frobenius action mod precision
     MM = deepcopy(M)
     for i in 1:n-1
@@ -853,14 +853,14 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
         # Multiply
         M = MM * M
     end
-    @info M
+    #@info M
 
     # Step 4: Determine L polynomial
     ZPol,t = PolynomialRing(FlintZZ,"t")
     #CP = charpoly(PolynomialRing(base_ring(M),"t")[1],M::MatElem{RingElem})
     #CP = invoke(charpoly, Tuple{Ring, Union{MatElem{Nemo.nmod},Generic.Mat}},  PolynomialRing(base_ring(M),"t")[1], M)
     CP = charpoly(PolynomialRing(base_ring(M),"t")[1], M)
-    @info CP
+    #@info CP
     Chi = cast_poly_nmod(ZPol, CP)
     L = numerator(t^(2*g)*(Chi)(1//t))
     coeff_ = [ coeff(L, i) for i in 0:(2*g) ]
@@ -1012,7 +1012,7 @@ function superelliptic_automorphism(a, h, p, n, P)
     K = base_ring(h)
     R,X = PolynomialRing(K, "x")
     D = Hecke.Hensel_factorization(divexact(X^a - 1, X - 1))
-    @info D
+    #@info D
     zeta = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
 
     return (P[1], zeta*P[2])
@@ -1554,7 +1554,7 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, 
                 K = Kmun(base_ring(h), a)
                 R,X = PolynomialRing(K, "x")
                 D = Hecke.Hensel_factorization(divexact(X^a - 1, X - 1))
-                @info D
+                #@info D
                 zeta = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
                 #zeta = prim_root(K)^(divexact(ZZ(p^degree(K) - 1),a))#teichmuller(K(lift_elem(gen(FiniteField(prime(K), l, "w")[1]))))^l
                 @assert zeta^a == 1
@@ -1563,14 +1563,14 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, 
                 # TODO check this is always compatible, not always conway!! for large p
                 xK = (K(lift_elem(x[1])),K(lift_elem(x[2]))) # x base changed to K
                 muxK = superelliptic_automorphism(a, hK, p, degree(K), xK)
-                @info xK
-                @info muxK
+                #@info xK
+                #@info muxK
 
                 return [get_padic(inv(zeta^(-ij[2]) - 1)*b) + O(base_ring(h), prime(base_ring(h))^N) for (ij, b) in zip(BasisMonomials(a, h), TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK))]
             else
                 B = lift_y(a, h, base_ring(h)(0), x[1])
-                @info x
-                @info B
+                #@info x
+                #@info B
 
                 return TinyColemanIntegralsOnBasis(a, h, N, p, n, B, x)
             end
