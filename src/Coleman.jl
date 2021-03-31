@@ -585,8 +585,8 @@ function AbsoluteFrobeniusAction(a, hbar, N, pts = [])
             R1 = ResidueRing(FlintZZ, FlintZZ(p)^(N+1))
         end
     else
-        R0 = FlintQadicField(p, n, N)
-        R1 = FlintQadicField(p, n, N + 1)
+        R0,_ = FlintQadicField(p, n, N)
+        R1,_ = FlintQadicField(p, n, N + 1)
     end
     R0Pol,t1 = PolynomialRing(R0,'t')
     R1Pol,t2 = PolynomialRing(R1,'t')
@@ -647,8 +647,8 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
                 R1 = ResidueRing(FlintZZ, FlintZZ(p)^(N+1))
             end
         else
-            R0 = FlintQadicField(p, n, N)
-            R1 = FlintQadicField(p, n, N + 1)
+            R0,_ = FlintQadicField(p, n, N)
+            R1,_ = FlintQadicField(p, n, N + 1)
         end
     else # use a power series ring!
         if n == 1
@@ -1042,58 +1042,6 @@ end
 
 function (f::Generic.Frac{<:PolyElem})(x::RingElem)
     return numerator(f)(x)//denominator(f)(x)
-end
-
-
-###############################################################################
-#
-#   Shifting
-#
-###############################################################################
-
-#@doc Markdown.doc"""
-#    integral(x::AbstractAlgebra.AbsSeriesElem{T}) where {T <: RingElement}
-#> Return the integral of the power series $x$.
-#"""
-function Generic.integral(x::AbsSeriesElem{T}) where {T <: RingElement}
-   xlen = length(x)
-   prec = precision(x) + 1
-   prec = min(prec, max_precision(parent(x)))
-   if xlen == 0
-      z = zero(parent(x))
-      set_prec!(z, prec)
-      return z
-   end
-   zlen = min(prec, xlen + 1)
-   z = parent(x)()
-   fit!(z, zlen)
-   set_prec!(z, prec)
-   z = setcoeff!(z, 0, zero(base_ring(x)))
-   for i = 1:xlen
-       z = setcoeff!(z, i, coeff(x, i - 1) // base_ring(x)(i))
-   end
-   set_length!(z, normalise(z, zlen))
-   return z
-end
-
-#@doc Markdown.doc"""
-#    derivative(x::AbstractAlgebra.AbsSeriesElem{T}) where {T <: RingElement}
-#> Return the derivative of the power series $x$.
-#"""
-function Generic.derivative(x::AbsSeriesElem{T}) where {T <: RingElement}
-   xlen = length(x)
-   if 1 >= xlen
-      z = zero(parent(x))
-      set_prec!(z, max(0, precision(x) - 1))
-      return z
-   end
-   z = parent(x)()
-   fit!(z, xlen - 1)
-   set_prec!(z, precision(x) - 1)
-   for i = 1:xlen - 1
-      z = setcoeff!(z, i - 1, i * coeff(x, i))
-   end
-   return z
 end
 
 
@@ -1509,7 +1457,7 @@ function Kmun(K, n)
     T = ResidueRing(ZZ, ZZ(n))
     p = prime(K)
     # need n % p^m - 1
-    return FlintQadicField(prime(K), multiplicative_order(T(p)), K.prec_max)
+    return FlintQadicField(prime(K), multiplicative_order(T(p)), K.prec_max)[1]
 end
 
 # vector of Coleman functons I(P) = int_P^y in the disk around x
