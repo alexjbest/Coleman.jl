@@ -312,7 +312,7 @@ function HRedMatrix(t, iota, a, h, R1PolMatH, pts)
     resM = zero(R1PolMatH)
 
     b = degree(h)
-    lambda = lead(h)
+    lambda = leading_coefficient(h)
     h1 = h - lambda*s^b # h - leading term (h)
 
     resD =  lambda*(b*(a*t+iota-a) -a*s)
@@ -1128,7 +1128,7 @@ function LocalCoordsInf(a, h, N, p, P, pts = [])
     K = base_ring(h)
     b = degree(h)
     _,l,k = gcdx(b,a)
-    lambda = lead(h)
+    lambda = leading_coefficient(h)
     k = -k
     @assert b* l - a* k == 1
     @assert K.prec_max >= N

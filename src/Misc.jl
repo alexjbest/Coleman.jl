@@ -55,11 +55,11 @@ function Generic.mod(f::Generic.PolyElem{T}, g::Generic.PolyElem{T}) where {T <:
    end
    if length(f) >= length(g)
       f = deepcopy(f)
-      b = lead(g)
+      b = leading_coefficient(g)
       g = inv(b)*g
       c = base_ring(f)()
       while length(f) >= length(g)
-         l = -lead(f)
+         l = -leading_coefficient(f)
          for i = 1:length(g) - 1
             c = mul!(c, coeff(g, i - 1), l)
             u = coeff(f, i + length(f) - length(g) - 1)

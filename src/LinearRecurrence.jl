@@ -1169,13 +1169,13 @@ function mod!(f::PolyElem{T}, h, g) where {T}
    set!(f, h)
 
    if length(h) >= length(g)
-      b = lead(g)
+      b = leading_coefficient(g)
       if !isone(b)
         g = inv(b)*g
       end
       c = base_ring(f)()
       while length(f) >= length(g)
-         l = -lead(f)
+         l = -leading_coefficient(f)
          for i = 1:length(g) - 1
             c = mul!(c, coeff(g, i - 1), l)
             u = coeff(f, i + length(f) - length(g) - 1)
