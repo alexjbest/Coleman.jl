@@ -585,8 +585,8 @@ function AbsoluteFrobeniusAction(a, hbar, N, pts = [])
             R1 = ResidueRing(FlintZZ, FlintZZ(p)^(N+1))
         end
     else
-        R0 = FlintQadicField(p, n, N)
-        R1 = FlintQadicField(p, n, N + 1)
+        R0,_ = FlintQadicField(p, n, N)
+        R1,_ = FlintQadicField(p, n, N + 1)
     end
     R0Pol,t1 = PolynomialRing(R0,'t')
     R1Pol,t2 = PolynomialRing(R1,'t')
@@ -647,8 +647,8 @@ function AbsoluteFrobeniusActionOnLift(a, h, N, p, n, pts = [])#(a::RngIntElt, h
                 R1 = ResidueRing(FlintZZ, FlintZZ(p)^(N+1))
             end
         else
-            R0 = FlintQadicField(p, n, N)
-            R1 = FlintQadicField(p, n, N + 1)
+            R0,_ = FlintQadicField(p, n, N)
+            R1,_ = FlintQadicField(p, n, N + 1)
         end
     else # use a power series ring!
         if n == 1
@@ -839,12 +839,12 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
     bound = n*g/2 + 2*g*log(p,2)
     # N is the first integer strictly larger than bound
     N = floor(Int, bound+1)
-    @info N
+    #@info N
 
     # Step 2: Determine absolute Frobenius action mod precision
     M = AbsoluteFrobeniusAction(a, hbar, N)
 
-    @info M
+    #@info M
     # Step 3: Determine Frobenius action mod precision
     MM = deepcopy(M)
     for i in 1:n-1
@@ -853,14 +853,14 @@ function ZetaFunction(a, hbar)#(a::RngIntElt, hbar::RngUPolElt)
         # Multiply
         M = MM * M
     end
-    @info M
+    #@info M
 
     # Step 4: Determine L polynomial
     ZPol,t = PolynomialRing(FlintZZ,"t")
     #CP = charpoly(PolynomialRing(base_ring(M),"t")[1],M::MatElem{RingElem})
     #CP = invoke(charpoly, Tuple{Ring, Union{MatElem{Nemo.nmod},Generic.Mat}},  PolynomialRing(base_ring(M),"t")[1], M)
     CP = charpoly(PolynomialRing(base_ring(M),"t")[1], M)
-    @info CP
+    #@info CP
     Chi = cast_poly_nmod(ZPol, CP)
     L = numerator(t^(2*g)*(Chi)(1//t))
     coeff_ = [ coeff(L, i) for i in 0:(2*g) ]
@@ -1012,7 +1012,7 @@ function superelliptic_automorphism(a, h, p, n, P)
     K = base_ring(h)
     R,X = PolynomialRing(K, "x")
     D = Hecke.Hensel_factorization(divexact(X^a - 1, X - 1))
-    @info D
+    #@info D
     zeta = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
 
     return (P[1], zeta*P[2])
@@ -1042,58 +1042,6 @@ end
 
 function (f::Generic.Frac{<:PolyElem})(x::RingElem)
     return numerator(f)(x)//denominator(f)(x)
-end
-
-
-###############################################################################
-#
-#   Shifting
-#
-###############################################################################
-
-#@doc Markdown.doc"""
-#    integral(x::AbstractAlgebra.AbsSeriesElem{T}) where {T <: RingElement}
-#> Return the integral of the power series $x$.
-#"""
-function Generic.integral(x::AbsSeriesElem{T}) where {T <: RingElement}
-   xlen = length(x)
-   prec = precision(x) + 1
-   prec = min(prec, max_precision(parent(x)))
-   if xlen == 0
-      z = zero(parent(x))
-      set_prec!(z, prec)
-      return z
-   end
-   zlen = min(prec, xlen + 1)
-   z = parent(x)()
-   fit!(z, zlen)
-   set_prec!(z, prec)
-   z = setcoeff!(z, 0, zero(base_ring(x)))
-   for i = 1:xlen
-       z = setcoeff!(z, i, coeff(x, i - 1) // base_ring(x)(i))
-   end
-   set_length!(z, normalise(z, zlen))
-   return z
-end
-
-#@doc Markdown.doc"""
-#    derivative(x::AbstractAlgebra.AbsSeriesElem{T}) where {T <: RingElement}
-#> Return the derivative of the power series $x$.
-#"""
-function Generic.derivative(x::AbsSeriesElem{T}) where {T <: RingElement}
-   xlen = length(x)
-   if 1 >= xlen
-      z = zero(parent(x))
-      set_prec!(z, max(0, precision(x) - 1))
-      return z
-   end
-   z = parent(x)()
-   fit!(z, xlen - 1)
-   set_prec!(z, precision(x) - 1)
-   for i = 1:xlen - 1
-      z = setcoeff!(z, i - 1, i * coeff(x, i))
-   end
-   return z
 end
 
 
@@ -1509,7 +1457,7 @@ function Kmun(K, n)
     T = ResidueRing(ZZ, ZZ(n))
     p = prime(K)
     # need n % p^m - 1
-    return FlintQadicField(prime(K), multiplicative_order(T(p)), K.prec_max)
+    return FlintQadicField(prime(K), multiplicative_order(T(p)), K.prec_max)[1]
 end
 
 # vector of Coleman functons I(P) = int_P^y in the disk around x
@@ -1554,7 +1502,7 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, 
                 K = Kmun(base_ring(h), a)
                 R,X = PolynomialRing(K, "x")
                 D = Hecke.Hensel_factorization(divexact(X^a - 1, X - 1))
-                @info D
+                #@info D
                 zeta = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
                 #zeta = prim_root(K)^(divexact(ZZ(p^degree(K) - 1),a))#teichmuller(K(lift_elem(gen(FiniteField(prime(K), l, "w")[1]))))^l
                 @assert zeta^a == 1
@@ -1563,14 +1511,14 @@ function ColemanIntegrals(a, h, N, p, n, x::Tuple, y = :inf; frobact = nothing, 
                 # TODO check this is always compatible, not always conway!! for large p
                 xK = (K(lift_elem(x[1])),K(lift_elem(x[2]))) # x base changed to K
                 muxK = superelliptic_automorphism(a, hK, p, degree(K), xK)
-                @info xK
-                @info muxK
+                #@info xK
+                #@info muxK
 
                 return [get_padic(inv(zeta^(-ij[2]) - 1)*b) + O(base_ring(h), prime(base_ring(h))^N) for (ij, b) in zip(BasisMonomials(a, h), TinyColemanIntegralsOnBasis(a, hK, N, p, degree(K), xK, muxK))]
             else
                 B = lift_y(a, h, base_ring(h)(0), x[1])
-                @info x
-                @info B
+                #@info x
+                #@info B
 
                 return TinyColemanIntegralsOnBasis(a, h, N, p, n, B, x)
             end

@@ -58,9 +58,8 @@ function test_rat_pts(a, h, bound, rat_pts)
 end
 function papertest()
     A = 3
-    K = QadicField(41,2,7)
+    K,a = QadicField(41,2,7)
     R,x = PolynomialRing(K, "x")
-    a = gen(K)
     h = x^4 + 7*x^3 + 3*x^2 - x
     print("coleman integrals on y^",A,"=",h,"...")
     P = Coleman.lift_point(A, h, K(1), 14*a+11) # the point (1,10^1/3)
@@ -72,7 +71,7 @@ end
 
 function rational_torsion_irrat_curve()
     A = 2
-    K = QadicField(43,2,7)
+    K = QadicField(43,2,7)[1]
     R,x = PolynomialRing(K, "x")
     D = Hecke.Hensel_factorization(x^2 -x+3)
     a = -coeff([D[k] for k in keys(D)][1],0)
@@ -85,7 +84,7 @@ end
 
 function cubic_number_field_ex()
     A = 2
-    K = QadicField(73,3,7)
+    K = QadicField(73,3,7)[1]
     R,x = PolynomialRing(K, "x")
     D = Hecke.Hensel_factorization(x^3 -x^2+1)
     a = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
@@ -99,7 +98,7 @@ end
 function quartic_number_field_ex()
     # LMFDB ecnf 4.4.725.1-16.1-a1
     A = 2
-    K = QadicField(43,4,7)
+    K = QadicField(43,4,7)[1]
     R,x = PolynomialRing(K, "x")
     D = Hecke.Hensel_factorization(x^4 - x^3 - 3*x^2 + x + 1)
     a = -coeff([D[k] for k in keys(D) if degree(D[k]) == 1][1],0)
