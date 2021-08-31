@@ -1,10 +1,10 @@
 name: Run tests
 
 on:
-push:
-pull_request:
-schedule:
-  - cron: '0 13 * * 1'
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 13 * * 1'
 
 jobs:
   test:
