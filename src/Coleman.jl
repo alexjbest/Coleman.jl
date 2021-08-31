@@ -38,7 +38,7 @@ include("Misc.jl")
 #import AbstractAlgebra.Ring
 #import AbstractAlgebra.PolyRing
 #import AbstractAlgebra.Generic.LaurentSeriesFieldElem
-using Hecke, Nemo, LoadFlint
+using Hecke, Nemo, LoadFlint, AbstractAlgebra
 
 const libflint = LoadFlint.libflint
 
@@ -147,12 +147,12 @@ function ScalarCoefficients(j, k, a, hk, p, q, N)
 end
 
 function myinv(M)
-    de = det_df(M)
+    de = AbstractAlgebra.det_df(M)
     ad = zero(M)
 
     for i in 1:nrows(M)
         for j in 1:ncols(M)
-            ad[i,j] = (-1)^(i+j)*det_df(M[[q for q in 1:nrows(M) if q != i], [w for w in 1:nrows(M) if w != j]])
+            ad[i,j] = (-1)^(i+j)*AbstractAlgebra.det_df(M[[q for q in 1:nrows(M) if q != i], [w for w in 1:nrows(M) if w != j]])
         end
     end
 

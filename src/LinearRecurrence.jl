@@ -35,6 +35,7 @@ using Nemo
 
 import AbstractAlgebra.PolyElem
 import AbstractAlgebra.SeriesElem
+export xadic_to_padic
 
 function xadic_to_padic(f::SeriesElem, R::PadicField)
     ret = zero(R)
@@ -145,22 +146,6 @@ function LowerCaseDD(alpha,beta,d)
       res = mul!(res, res, t)
     end
     return res
-end
-
-function Nemo.add!(z::fmpq_abs_series, a::fmpq_abs_series, b::fmpq_abs_series)
-   lena = length(a)
-   lenb = length(b)
-
-   prec = min(a.prec, b.prec)
-
-   lena = min(lena, prec)
-   lenb = min(lenb, prec)
-
-   lenz = max(lena, lenb)
-   ccall((:fmpq_poly_add_series, Coleman.libflint), Nothing,
-                (Ref{fmpq_abs_series}, Ref{fmpq_abs_series}, Ref{fmpq_abs_series}, Int),
-               z, a, b, lenz)
-   return z
 end
 
 

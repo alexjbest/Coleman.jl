@@ -16,10 +16,6 @@ function Nemo.root(x::fmpq, n::Int64)
 end
 
 
-function (R::Nemo.GaloisField)(x::fmpq)
-    return R(numerator(x))//R(denominator(x))
-end
-
 function Nemo.order(x::FinFieldElem)
     i = 1
     pow = x
@@ -50,34 +46,6 @@ function (f::LaurentSeriesFieldElem)(x::LaurentSeriesFieldElem)
     return ret + O(gen(parent(f))^precision(f))
 end
 
-
-function Generic.integral(x::Generic.LaurentSeriesElem)
-   z = deepcopy(x)
-   set_precision!(z, precision(x) + 1)
-   set_valuation!(z, valuation(x) + 1)
-   len = pol_length(x)
-   for i = 1:len
-       z = setcoeff!(z, i - 1, polcoeff(x, i - 1)//((i-1)*Generic.scale(z)+valuation(z)))
-   end
-   set_length!(z, normalise(z, len))
-   renormalize!(z)
-   z = rescale!(z)
-   return z
-end
-
-function Generic.derivative(x::Generic.LaurentSeriesElem)
-   z = deepcopy(x)
-   set_precision!(z, precision(x) - 1)
-   set_valuation!(z, valuation(x) - 1)
-   len = pol_length(x)
-   for i = 1:len
-       z = setcoeff!(z, i - 1, ((i-1)*Generic.scale(z)+valuation(z) + 1)*polcoeff(x, i - 1))
-   end
-   set_length!(z, normalise(z, len))
-   renormalize!(z)
-   z = rescale!(z)
-   return z
-end
 
 
 function Generic.mod(f::Generic.PolyElem{T}, g::Generic.PolyElem{T}) where {T <: Generic.SeriesElem}
