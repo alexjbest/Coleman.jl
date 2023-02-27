@@ -1423,7 +1423,7 @@ function rational_points(a, h::fmpq_poly, bound)
     ret = Tuple{fmpq,fmpq}[]
     while height(x) <= bound
         try
-            y = Coleman.root(h(x), a)
+            y = root(h(x), a)
             push!(ret, (x,y))
             if a == 2
                 push!(ret, (x,-y))
