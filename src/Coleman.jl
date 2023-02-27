@@ -57,7 +57,7 @@ function Nemo.frobenius(a::Generic.Poly)
     return parent(a)([frobenius(coeff(a, i)) for i in 0:degree(a)])
 end
 
-function Nemo.degree(R::ResidueRing{fmpz})
+function Nemo.degree(R::Generic.ResidueRing{fmpz})
     return 1
 end
 
