@@ -3,18 +3,6 @@ import AbstractAlgebra.Generic.LaurentSeriesElem
 import AbstractAlgebra.Generic.LaurentSeriesFieldElem
 import AbstractAlgebra.Generic.PolyElem
 
-#@doc Markdown.doc"""
-#    root(a::fmpq, n::Int)
-#> Given $x$ and in integer $n$, returns $\sqrt[n]{x}$ if it exists.
-#"""
-function Nemo.root(x::fmpq, n::Int64)
-   nnum = root(numerator(x), n)
-   (nnum^n != numerator(x)) && throw(DomainError("Argument $x has no $n th root"))
-   nden = root(denominator(x), n)
-   (nden^n != denominator(x)) && throw(DomainError("Argument $x has no $n th root"))
-   return nnum//nden
-end
-
 
 function Nemo.order(x::FinFieldElem)
     i = 1
